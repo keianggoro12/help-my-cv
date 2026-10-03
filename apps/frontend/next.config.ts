@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   // `next dev` and `next build` both write `.next` by default, so running a
   // build while the dev server is up deletes the vendor chunks the server is
   // serving from and every route starts returning 500. Dev gets its own
@@ -17,6 +18,15 @@ const nextConfig: NextConfig = {
   // the outermost one as the tracing root, which pulls the wrong tree into the
   // standalone output. Pinning it to the monorepo root removes the ambiguity.
   outputFileTracingRoot: path.join(import.meta.dirname, "..", ".."),
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8788";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

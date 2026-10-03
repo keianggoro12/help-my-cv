@@ -26,8 +26,8 @@
 
 /** The hostnames reachable through a service binding, and the binding to use. */
 const SERVICE_BINDINGS: Record<string, string> = {
-  "jastip-backend.keianggoro12.workers.dev": "BACKEND",
-};
+    "helpmycv-backend-production.keianggoro12.workers.dev": "BACKEND",
+  };
 
 type ServiceFetcher = {
   fetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>;

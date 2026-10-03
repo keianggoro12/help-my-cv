@@ -20,11 +20,12 @@
  * the only undo.
  */
 
-import { ArrowLeft, Download, Eye, EyeOff, GripVertical, Loader2, Printer, Save } from "lucide-react";
+import { ArrowLeft, Download, Eye, EyeOff, GripVertical, LayoutDashboard, Loader2, Printer, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { useToast } from "@/components/ui/toast";
 import { PersonalSection } from "@/components/editor/personal-section";
 import { PreviewPanel } from "@/components/editor/preview-panel";
 import { SectionRail, useActiveSection } from "@/components/editor/section-rail";
@@ -60,6 +61,7 @@ export function EditorPage({ resumeId }: EditorPageProps) {
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -79,8 +81,21 @@ export function EditorPage({ resumeId }: EditorPageProps) {
   // columns of form plus a sheet at 1024px leaves the fields unusably thin.
   React.useEffect(() => {
     const query = window.matchMedia(PREVIEW_QUERY);
+    console.log('[EditorPage] matchMedia matches:', query.matches, 'media:', query.media);
     setPreviewOpen(query.matches);
-    const onChange = (event: MediaQueryListEvent) => setPreviewOpen(event.matches);
+    const onChange = (event: MediaQueryListEvent) => {
+      console.log('[EditorPage] matchMedia changed:', event.matches);
+      setPreviewOpen(event.matches);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  // Close mobile sidebar when screen grows past lg
+  React.useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    if (query.matches) setSidebarOpen(false);
+    const onChange = (event: MediaQueryListEvent) => event.matches && setSidebarOpen(false);
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
   }, []);
@@ -137,8 +152,17 @@ export function EditorPage({ resumeId }: EditorPageProps) {
       setSaving(false);
       setDirty(false);
       setSaved(true);
+      toast({ type: "success", title: t("resume.saved") });
     }, 250);
   }
+
+  function handleDownload() {
+    if (!resume || dirty || saving) return;
+    window.print();
+    toast({ type: "info", title: t("editor.download"), message: t("editor.printDialogOpened") });
+  }
+
+  const { toast } = useToast();
 
   const sectionKeys = React.useMemo(
     () => (resume ? resume.sections.map((section) => section.key) : []),
@@ -180,7 +204,7 @@ export function EditorPage({ resumeId }: EditorPageProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => setPreviewOpen((open) => !open)}
@@ -191,6 +215,16 @@ export function EditorPage({ resumeId }: EditorPageProps) {
             {previewOpen ? t("editor.hidePreview") : t("editor.showPreview")}
           </Button>
 
+          <Button
+            variant="outline"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-pressed={sidebarOpen}
+            className="xl:hidden"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            {t("editor.sections")}
+          </Button>
+
           <Button variant="outline" onClick={() => window.print()} aria-label={t("editor.print")}>
             <Printer className="h-4 w-4" />
             {t("editor.print")}
@@ -198,7 +232,7 @@ export function EditorPage({ resumeId }: EditorPageProps) {
 
           <Button
             variant="outline"
-            onClick={() => window.print()}
+            onClick={handleDownload}
             disabled={!resume || dirty || saving}
             aria-label={t("editor.download")}
             title={dirty || saving ? t("editor.downloadDisabled") : t("editor.download")}
@@ -217,6 +251,32 @@ export function EditorPage({ resumeId }: EditorPageProps) {
       {/* The middle column scrolls; the rail and the preview get their own
           scroll areas so a long form never scrolls the preview out of view. */}
       <div className="flex min-h-0 flex-1 gap-4 pt-4">
+        {/* Mobile sidebar drawer */}
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-40 w-72 transform overflow-y-auto bg-card border-r shadow-xl transition-transform duration-300 lg:hidden lg:relative lg:translate-x-0 lg:shadow-none lg:border-none",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+          aria-label={t("editor.sections")}
+        >
+          <div className="flex items-center justify-between border-b p-3 lg:hidden">
+            <p className="font-semibold text-foreground">{t("editor.outline")}</p>
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} aria-label="Close">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <SectionRail
+            sections={resume.sections}
+            locale={locale}
+            activeKey={activeKey}
+            onReorder={reorderSections}
+            onToggle={handleToggle}
+            onJump={jumpToSection}
+            t={t}
+          />
+        </aside>
+
+        {/* Desktop sidebar */}
         <aside className="hidden w-56 shrink-0 overflow-y-auto pb-8 lg:block">
           <SectionRail
             sections={resume.sections}
@@ -228,6 +288,15 @@ export function EditorPage({ resumeId }: EditorPageProps) {
             t={t}
           />
         </aside>
+
+        {/* Backdrop for mobile sidebar */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
         <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto pb-16">
           <div className="space-y-4">

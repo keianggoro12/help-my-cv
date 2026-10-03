@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 assets = { directory = ".open-next/assets", binding = "ASSETS" }
 
 [vars]
-NEXT_PUBLIC_API_URL = "https://helpmycv-backend.keianggoro12.workers.dev"
+NEXT_PUBLIC_API_BASE_URL = "https://helpmycv-backend-production.keianggoro12.workers.dev"
 
 # Same-account service binding to the backend Worker. The frontend's /api/*
 # rewrite destination is a workers.dev host, which a Worker cannot fetch()

@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -43,6 +44,7 @@ const ERROR_MESSAGES: Record<AuthError, string> = {
 export function AuthDialog({ open, onClose, initialMode = "login", adminOnly = false }: AuthDialogProps) {
   const router = useRouter();
   const { t } = useSession();
+  const { toast } = useToast();
 
   const [mode, setMode] = React.useState<Mode>(initialMode);
   const [error, setError] = React.useState<AuthError | null>(null);
@@ -68,20 +70,28 @@ export function AuthDialog({ open, onClose, initialMode = "login", adminOnly = f
     setPending(true);
     setError(null);
 
-    const result =
+    const resultPromise =
       mode === "login"
         ? signIn({ email, password }, adminOnly ? "admin" : "user")
         : register({ name, phone, email, password, confirmPassword });
 
-    setPending(false);
+    resultPromise.then((result) => {
+      setPending(false);
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-    onClose();
-    router.push(result.user.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
+      toast({
+        type: "success",
+        title: mode === "login" ? t("auth.loginSuccess") : t("auth.registerSuccess"),
+        message: mode === "login" ? t("auth.welcomeBack", { name: result.user.name }) : t("auth.accountCreated"),
+      });
+
+      onClose();
+      router.push(result.user.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
+    });
   }
 
   const errorText = error

@@ -7,19 +7,22 @@
  * through the public form. `signIn` takes an expected role so the user login
  * and the admin login reject each other's accounts instead of letting a normal
  * user walk into /admin.
+ *
+ * When API is enabled, uses the real backend and stores the JWT token.
  */
 
 import type { Credentials, RegistrationInput, UserProfile, UserRole } from "@helpmycv/shared";
 import { createId } from "@helpmycv/shared";
 
 import { readJson, removeKey, STORAGE_KEYS, writeJson } from "@/lib/storage";
+import { API_ENABLED, api, writeToken } from "@/lib/api-client";
 
 type UserMap = Record<string, UserProfile>;
 type PasswordMap = Record<string, string>;
 
 export const DEMO_CREDENTIALS = {
-  user: { email: "user@helpmycv.id", password: "password123" },
-  admin: { email: "admin@helpmycv.id", password: "admin123" },
+  user: { email: "user@helpmycv.id", password: "user12345" },
+  admin: { email: "admin@helpmycv.id", password: "admin12345" },
 } as const;
 
 export type AuthResult = { ok: true; user: UserProfile } | { ok: false; error: AuthError };
@@ -52,8 +55,8 @@ function seedUsers(): UserMap {
 
 function seedPasswords(): PasswordMap {
   return {
-    [DEMO_CREDENTIALS.user.email]: DEMO_CREDENTIALS.user.password,
-    [DEMO_CREDENTIALS.admin.email]: DEMO_CREDENTIALS.admin.password,
+    "user@helpmycv.id": "user12345",
+    "admin@helpmycv.id": "admin12345",
   };
 }
 
@@ -65,7 +68,7 @@ function loadPasswords(): PasswordMap {
   return readJson<PasswordMap>(STORAGE_KEYS.passwords, seedPasswords());
 }
 
-export function signIn(credentials: Credentials, expectedRole: UserRole): AuthResult {
+export async function signIn(credentials: Credentials, expectedRole: UserRole): Promise<AuthResult> {
   const email = credentials.email.trim().toLowerCase();
   const users = loadUsers();
   const passwords = loadPasswords();
@@ -83,10 +86,21 @@ export function signIn(credentials: Credentials, expectedRole: UserRole): AuthRe
   }
 
   writeJson(STORAGE_KEYS.session, user);
+
+  // If API enabled, call backend to get real JWT token (required for API calls)
+  if (API_ENABLED) {
+    const result = await api.login({ email, password: credentials.password });
+    writeToken(result.token);
+    // Update user with backend data (includes imageUrl)
+    const updatedUser = { ...user, ...result.user };
+    writeJson(STORAGE_KEYS.session, updatedUser);
+    return { ok: true, user: updatedUser };
+  }
+
   return { ok: true, user };
 }
 
-export function register(input: RegistrationInput): AuthResult {
+export async function register(input: RegistrationInput): Promise<AuthResult> {
   if (input.password !== input.confirmPassword) {
     return { ok: false, error: "passwordMismatch" };
   }
@@ -98,21 +112,32 @@ export function register(input: RegistrationInput): AuthResult {
     return { ok: false, error: "emailTaken" };
   }
 
-  const user: UserProfile = {
+  const now = new Date().toISOString();
+  const newUser: UserProfile = {
     id: createId("usr"),
     name: input.name.trim(),
     email,
     phone: input.phone.trim(),
     role: "user",
     imageUrl: null,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   };
 
-  writeJson(STORAGE_KEYS.users, { ...users, [email]: user });
+  const updatedUsers = { ...users, [email]: newUser };
+  writeJson(STORAGE_KEYS.users, updatedUsers);
   writeJson(STORAGE_KEYS.passwords, { ...loadPasswords(), [email]: input.password });
-  writeJson(STORAGE_KEYS.session, user);
+  writeJson(STORAGE_KEYS.session, newUser);
 
-  return { ok: true, user };
+  // If API enabled, also register on backend
+  if (API_ENABLED) {
+    const result = await api.register({ name: input.name.trim(), email, password: input.password });
+    writeToken(result.token);
+    const updatedUser = { ...newUser, ...result.user };
+    writeJson(STORAGE_KEYS.session, updatedUser);
+    return { ok: true, user: updatedUser };
+  }
+
+  return { ok: true, user: newUser };
 }
 
 export function getSession(): UserProfile | null {
@@ -121,6 +146,10 @@ export function getSession(): UserProfile | null {
 
 export function signOut(): void {
   removeKey(STORAGE_KEYS.session);
+  if (API_ENABLED) {
+    writeToken(null);
+    api.logout().catch(() => {});
+  }
 }
 
 export function updateProfile(userId: string, patch: Partial<UserProfile>): UserProfile | null {
