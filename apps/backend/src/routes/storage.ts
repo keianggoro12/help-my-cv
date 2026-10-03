@@ -1,7 +1,6 @@
 import type { Env } from "../lib/helpers";
 import { json } from "../lib/helpers";
 import type { AppVariables } from "../middleware/auth";
-import { requireAuth } from "../middleware/auth";
 import { Hono } from "hono";
 
 type AppEnv = { Bindings: Env; Variables: AppVariables };
@@ -17,9 +16,15 @@ function newId(): string {
 
 export const storageRoutes = new Hono<AppEnv>();
 
-storageRoutes.use("*", requireAuth);
-
+// Writes require a session; reads do not. An `<img src>` request carries no
+// Authorization header, so gating the GET behind `requireAuth` made every
+// stored avatar render as a broken image. Object keys are
+// `uploads/<userId>/<timestamp>_<12 random bytes>.<ext>`, which are not
+// guessable, so a public read is safe here.
 storageRoutes.post("/upload", async (c) => {
+  if (!c.get("user")) {
+    return json({ error: "unauthenticated" }, 401);
+  }
   const form = await c.req.formData();
   const file = form.get("file");
   if (!file || !(file instanceof File)) {
