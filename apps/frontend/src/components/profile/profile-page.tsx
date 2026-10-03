@@ -11,7 +11,7 @@ import { FieldLabel } from "@/components/ui/field-label";
 import { Input } from "@/components/ui/input";
 import { updateProfile } from "@/lib/auth-store";
 import { formatDate } from "@/lib/format";
-import { API_BASE, readToken } from "@/lib/api-client";
+import { readToken } from "@/lib/api-client";
 import { Camera, Loader2 } from "lucide-react";
 
 function AvatarPreview({ name, imageUrl }: { name: string; imageUrl: string | null | undefined }) {
@@ -58,8 +58,9 @@ export function ProfilePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        let url = data?.url;
-        if (url && url.startsWith("/")) url = `${API_BASE}${url}`;
+        // The backend returns a root-relative path, which is already correct for
+        // an <img src> against the same origin that served this page.
+        const url = data?.url;
         if (url) {
           updateProfile(user.id, { imageUrl: url });
           refresh();

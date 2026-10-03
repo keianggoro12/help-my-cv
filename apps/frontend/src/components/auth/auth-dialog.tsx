@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel } from "@/components/ui/field-label";
 import { Input } from "@/components/ui/input";
-import { DEMO_CREDENTIALS, register, signIn, type AuthError } from "@/lib/auth-store";
+import { register, signIn, type AuthError } from "@/lib/auth-store";
 
 type Mode = "login" | "register";
 
@@ -75,23 +75,32 @@ export function AuthDialog({ open, onClose, initialMode = "login", adminOnly = f
         ? signIn({ email, password }, adminOnly ? "admin" : "user")
         : register({ name, phone, email, password, confirmPassword });
 
-    resultPromise.then((result) => {
-      setPending(false);
+    // `.catch` is not optional: `signIn` rethrows anything that is not a 401 (a
+    // dead backend, a CORS failure, a 500). Without it `setPending(false)`
+    // never runs and the dialog spins forever with no message at all.
+    resultPromise
+      .then((result) => {
+        setPending(false);
 
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
 
-      toast({
-        type: "success",
-        title: mode === "login" ? t("auth.loginSuccess") : t("auth.registerSuccess"),
-        message: mode === "login" ? t("auth.welcomeBack", { name: result.user.name }) : t("auth.accountCreated"),
+        toast({
+          type: "success",
+          title: mode === "login" ? t("auth.loginSuccess") : t("auth.registerSuccess"),
+          message: mode === "login" ? t("auth.welcomeBack", { name: result.user.name }) : t("auth.accountCreated"),
+        });
+
+        onClose();
+        router.push(result.user.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
+      })
+      .catch((error: unknown) => {
+        setPending(false);
+        setError("invalidCredentials");
+        console.error("auth request failed", error);
       });
-
-      onClose();
-      router.push(result.user.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
-    });
   }
 
   const errorText = error
@@ -183,15 +192,6 @@ export function AuthDialog({ open, onClose, initialMode = "login", adminOnly = f
         {errorText ? (
           <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {errorText}
-          </p>
-        ) : null}
-
-        {mode === "login" ? (
-          <p className="text-xs text-muted-foreground">
-            {t("auth.demoHint", {
-              email: adminOnly ? DEMO_CREDENTIALS.admin.email : DEMO_CREDENTIALS.user.email,
-              password: adminOnly ? DEMO_CREDENTIALS.admin.password : DEMO_CREDENTIALS.user.password,
-            })}
           </p>
         ) : null}
 

@@ -15,6 +15,11 @@ export type ApiUser = {
   name: string;
   email: string;
   role: "user" | "admin";
+  /**
+   * Avatar URL. Sent by `toApiUser` in the backend's auth route, but optional
+   * here: the admin user list omits it, and `register` does not return it yet.
+   */
+  imageUrl?: string | null;
 };
 
 export type ApiSession = {

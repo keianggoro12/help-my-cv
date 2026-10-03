@@ -11,11 +11,11 @@
  * When API is enabled, uses the real backend and stores the JWT token.
  */
 
-import type { Credentials, RegistrationInput, UserProfile, UserRole } from "@helpmycv/shared";
+import type { ApiUser, Credentials, RegistrationInput, UserProfile, UserRole } from "@helpmycv/shared";
 import { createId } from "@helpmycv/shared";
 
 import { readJson, removeKey, STORAGE_KEYS, writeJson } from "@/lib/storage";
-import { API_ENABLED, api, writeToken } from "@/lib/api-client";
+import { ApiError, API_ENABLED, api, writeToken } from "@/lib/api-client";
 
 type UserMap = Record<string, UserProfile>;
 type PasswordMap = Record<string, string>;
@@ -68,15 +68,64 @@ function loadPasswords(): PasswordMap {
   return readJson<PasswordMap>(STORAGE_KEYS.passwords, seedPasswords());
 }
 
+/**
+ * Widens an API user to the `UserProfile` the UI renders.
+ *
+ * The `users` table has no `phone` column and the login response carries no
+ * `created_at`, but `UserProfile` requires both — the profile page edits phone
+ * and shows "last updated". Anything already held locally wins, so a phone
+ * number typed into the profile page is not thrown away by a re-login, and the
+ * two values the API cannot supply get harmless defaults rather than `NaN`
+ * reaching `toLocaleDateString`.
+ */
+function toUserProfile(apiUser: ApiUser): UserProfile {
+  const existing = loadUsers()[apiUser.email];
+  return {
+    id: apiUser.id,
+    name: apiUser.name,
+    email: apiUser.email,
+    role: apiUser.role,
+    imageUrl: apiUser.imageUrl ?? existing?.imageUrl ?? null,
+    phone: existing?.phone ?? "",
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+  };
+}
+
 export async function signIn(credentials: Credentials, expectedRole: UserRole): Promise<AuthResult> {
   const email = credentials.email.trim().toLowerCase();
+  const password = credentials.password;
+
+  // With the API enabled the backend is the only authority on who exists and
+  // what their password is. The local mock list is not consulted first: it holds
+  // just the two seeded demo accounts, so any real account (a superadmin, say)
+  // would be rejected here before the request was ever made.
+  if (API_ENABLED) {
+    let result: Awaited<ReturnType<typeof api.login>>;
+    try {
+      result = await api.login({ email, password });
+    } catch (error) {
+      // A 401 means the credentials were refused; anything else is a transport
+      // or server fault and should not be reported as a wrong password.
+      if (error instanceof ApiError && error.status === 401) {
+        return { ok: false, error: "invalidCredentials" };
+      }
+      throw error;
+    }
+    // The role gate stays client-side so a normal user cannot walk into /admin.
+    if (result.user.role !== expectedRole) {
+      return { ok: false, error: "adminCredentials" };
+    }
+    writeToken(result.token);
+    writeJson(STORAGE_KEYS.session, toUserProfile(result.user));
+    return { ok: true, user: toUserProfile(result.user) };
+  }
+
   const users = loadUsers();
   const passwords = loadPasswords();
-
   const user = users[email];
   const storedPassword = passwords[email];
 
-  if (!user || !storedPassword || storedPassword !== credentials.password) {
+  if (!user || !storedPassword || storedPassword !== password) {
     return { ok: false, error: "invalidCredentials" };
   }
 
@@ -86,16 +135,6 @@ export async function signIn(credentials: Credentials, expectedRole: UserRole): 
   }
 
   writeJson(STORAGE_KEYS.session, user);
-
-  // If API enabled, call backend to get real JWT token (required for API calls)
-  if (API_ENABLED) {
-    const result = await api.login({ email, password: credentials.password });
-    writeToken(result.token);
-    // Update user with backend data (includes imageUrl)
-    const updatedUser = { ...user, ...result.user };
-    writeJson(STORAGE_KEYS.session, updatedUser);
-    return { ok: true, user: updatedUser };
-  }
 
   return { ok: true, user };
 }

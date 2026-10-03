@@ -22,9 +22,26 @@ import type {
   RegisterPayload,
 } from "@helpmycv/shared";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+/**
+ * Base URL the *browser* prepends to `/api/*`.
+ *
+ * Always empty on purpose. `NEXT_PUBLIC_API_BASE_URL` configures the
+ * server-side rewrite in `next.config.ts` and points local dev at wrangler on
+ * :8788; it must never be used as a fetch base in the browser. Baked in as a
+ * literal it makes every call cross-origin to a `workers.dev` host, which fails
+ * outright — a browser *can* reach it, but this is exactly the request the
+ * backend's own comments rule out, and any CORS or preflight hiccup surfaces
+ * only as an opaque "Failed to fetch" with no status to act on. Going through
+ * the same-origin rewrite also means the deployed Worker reaches the backend
+ * over its `BACKEND` service binding instead of leaving the account.
+ */
+export const API_BASE = "";
 
-/** True when the app should talk to the real backend instead of localStorage. */
+/**
+ * True when the app should talk to the real backend instead of localStorage.
+ *
+ * Keyed off the env var rather than `API_BASE`, which is now always empty.
+ */
 export const API_ENABLED = process.env.NEXT_PUBLIC_API_BASE_URL !== undefined;
 
 export class ApiError extends Error {
