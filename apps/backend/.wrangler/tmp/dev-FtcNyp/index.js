@@ -1991,7 +1991,7 @@ function normaliseEmail(value) {
 }
 __name(normaliseEmail, "normaliseEmail");
 function toApiUser(row) {
-  return { id: row.id, email: row.email, name: row.name, role: row.role === "admin" ? "admin" : "user" };
+  return { id: row.id, email: row.email, name: row.name, role: row.role === "admin" ? "admin" : "user", imageUrl: row.image_url ?? null };
 }
 __name(toApiUser, "toApiUser");
 async function handleRegister(env, request) {
@@ -2028,7 +2028,7 @@ async function handleLogin(env, request) {
   }
   const email = normaliseEmail(payload.email ?? "");
   const row = await env.DB.prepare(
-    "SELECT id, email, name, role, password_hash FROM users WHERE email = ?"
+    "SELECT id, email, name, role, password_hash, image_url FROM users WHERE email = ?"
   ).bind(email).first();
   const stored = row?.password_hash ?? DUMMY_HASH;
   const ok = await verifyPassword(payload.password ?? "", stored);

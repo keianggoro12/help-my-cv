@@ -121,18 +121,20 @@ export function PortalSidebar({
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <LanguageSwitch className="flex-1" />
-          <Button
-            variant="outline"
-            className="flex-1 justify-start"
-            onClick={handleSignOut}
-            aria-label={t("sidebar.signOut")}
-          >
-            <LogOut className="h-4 w-4" />
-            {t("sidebar.signOut")}
-          </Button>
+        <div className="space-y-2">
+          <LanguageSwitch className="w-full" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              className="flex-1 justify-start"
+              onClick={handleSignOut}
+              aria-label={t("sidebar.signOut")}
+            >
+              <LogOut className="h-4 w-4" />
+              {t("sidebar.signOut")}
+            </Button>
+          </div>
         </div>
       </div>
     </aside>
