@@ -61,6 +61,7 @@ export function EditorPage({ resumeId }: EditorPageProps) {
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [isWide, setIsWide] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -81,15 +82,25 @@ export function EditorPage({ resumeId }: EditorPageProps) {
   // columns of form plus a sheet at 1024px leaves the fields unusably thin.
   React.useEffect(() => {
     const query = window.matchMedia(PREVIEW_QUERY);
-    console.log('[EditorPage] matchMedia matches:', query.matches, 'media:', query.media);
+    setIsWide(query.matches);
     setPreviewOpen(query.matches);
     const onChange = (event: MediaQueryListEvent) => {
-      console.log('[EditorPage] matchMedia changed:', event.matches);
+      setIsWide(event.matches);
       setPreviewOpen(event.matches);
     };
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
   }, []);
+
+  // Below `xl` the preview takes over the whole screen (see `previewOnly`), so
+  // the section drawer has nothing left to scroll to. Close it if it was open.
+  const previewOnly = !isWide && previewOpen;
+
+  React.useEffect(() => {
+    if (previewOnly) {
+      setSidebarOpen(false);
+    }
+  }, [previewOnly]);
 
   // Close mobile sidebar when screen grows past lg
   React.useEffect(() => {
@@ -276,8 +287,14 @@ export function EditorPage({ resumeId }: EditorPageProps) {
           />
         </aside>
 
-        {/* Desktop sidebar */}
-        <aside className="hidden w-56 shrink-0 overflow-y-auto pb-8 lg:block">
+        {/* Desktop sidebar. Hidden while the narrow-screen preview is taking
+            over — rail rows scroll the form column, which is not on screen. */}
+        <aside
+          className={cn(
+            "hidden w-56 shrink-0 overflow-y-auto pb-8 lg:block",
+            previewOnly && "lg:hidden",
+          )}
+        >
           <SectionRail
             sections={resume.sections}
             locale={locale}
@@ -298,7 +315,16 @@ export function EditorPage({ resumeId }: EditorPageProps) {
           />
         )}
 
-        <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto pb-16">
+        {/* Below `xl` the preview is a full-width overlay rather than a third
+            column: at 45vw the sheet and the fields each got ~150px, so the
+            form was unusable on a phone. `hidden` (not `display:none` via a
+            conditional) keeps the field column mounted and its scroll state
+            intact, so toggling back is instant and no in-progress input is
+            lost. */}
+        <div
+          ref={scrollRef}
+          className={cn("min-w-0 flex-1 overflow-y-auto pb-16", previewOnly && "hidden")}
+        >
           <div className="space-y-4">
             {personalSection ? (
               <SectionShell
@@ -366,8 +392,9 @@ export function EditorPage({ resumeId }: EditorPageProps) {
         <aside
           className={cn(
             "shrink-0 overflow-hidden rounded-2xl border bg-card",
-            "w-[min(420px,45vw)]",
-            previewOpen ? "block" : "hidden",
+            // Full width on narrow screens so the sheet is legible; a capped
+            // column only when it shares the row with the form (xl and up).
+            previewOnly ? "w-full" : "hidden xl:block xl:w-[min(420px,45vw)]",
           )}
         >
           <PreviewPanel resume={resume} locale={locale} t={t} />
