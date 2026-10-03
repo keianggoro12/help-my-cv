@@ -1,0 +1,37 @@
+name = "helpmycv-frontend"
+main = ".open-next/worker.js"
+compatibility_date = "2025-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+[vars]
+NEXT_PUBLIC_API_URL = "https://helpmycv-backend.keianggoro12.workers.dev"
+
+# Same-account service binding to the backend Worker. The frontend's /api/*
+# rewrite destination is a workers.dev host, which a Worker cannot fetch()
+# directly; this binding is what makes the rewrite reach the backend.
+[[services]]
+binding = "BACKEND"
+service = "helpmycv-backend"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# Durable Objects for OpenNext
+[[durable_objects.bindings]]
+name = "DOQueueHandler"
+class_name = "DOQueueHandler"
+
+[[durable_objects.bindings]]
+name = "DOShardedTagCache"
+class_name = "DOShardedTagCache"
+
+[[durable_objects.bindings]]
+name = "BucketCachePurge"
+class_name = "BucketCachePurge"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]

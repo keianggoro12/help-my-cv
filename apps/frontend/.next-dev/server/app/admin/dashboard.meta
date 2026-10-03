@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/dashboard/layout,_N_T_/admin/dashboard/page,_N_T_/admin/dashboard"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/2bd5331f3525d12f73f4b0b0cec6c4917257cc9c0ae85ab48f473f86827c9b01/$/admin/dashboard",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/admin/dashboard/page"
+    },
+    "isFallback": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/admin/dashboard/page": "/admin/dashboard",
+  "/admin/profile/page": "/admin/profile",
+  "/admin/resumes/page": "/admin/resumes",
+  "/admin/users/page": "/admin/users",
+  "/admin/page": "/admin",
+  "/page": "/",
+  "/user/dashboard/page": "/user/dashboard",
+  "/user/[id]/edit/page": "/user/[id]/edit",
+  "/user/resume-builder/page": "/user/resume-builder",
+  "/user/profile/page": "/user/profile"
+}

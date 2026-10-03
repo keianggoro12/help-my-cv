@@ -1,0 +1,140 @@
+/**
+ * Thin API client for the Hono backend.
+ *
+ * Every call is a relative `/api/*` path on purpose: in production the frontend
+ * reaches the Worker through a service binding (or the same origin), and an
+ * absolute `workers.dev` URL cannot work there — a Worker cannot fetch another
+ * Worker on workers.dev. In local dev the base is rewritten by Next to
+ * `NEXT_PUBLIC_API_BASE_URL`, so the browser can point at wrangler on :8788.
+ *
+ * Nothing here knows about React. The stores in `auth-store.ts` and
+ * `resume-store.ts` decide whether to call this or read localStorage, so
+ * swapping the mock for the real backend is one branch in each store rather
+ * than a rewrite of every component.
+ */
+
+import type {
+  ApiResume,
+  ApiResumeSummary,
+  ApiUser,
+  CreateResumePayload,
+  LoginPayload,
+  RegisterPayload,
+} from "@helpmycv/shared";
+
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+/** True when the app should talk to the real backend instead of localStorage. */
+export const API_ENABLED = process.env.NEXT_PUBLIC_API_BASE_URL !== undefined;
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+  ) {
+    super(`${status} ${code}`);
+    this.name = "ApiError";
+  }
+}
+
+const TOKEN_KEY = "helpmycv:api-token";
+
+export function readToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function writeToken(token: string | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (token === null) {
+    window.localStorage.removeItem(TOKEN_KEY);
+    return;
+  }
+  window.localStorage.setItem(TOKEN_KEY, token);
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = readToken();
+  const headers = new Headers(init.headers);
+  if (init.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  const payload = (await response.json().catch(() => null)) as
+    | { error?: string }
+    | T
+    | null;
+
+  if (!response.ok) {
+    const code = (payload as { error?: string } | null)?.error ?? "request_failed";
+    // An expired or revoked token is not a retryable failure: drop it so the
+    // next call goes through the sign-in path instead of looping on 401.
+    if (response.status === 401) {
+      writeToken(null);
+    }
+    throw new ApiError(response.status, code);
+  }
+
+  return payload as T;
+}
+
+export const api = {
+  login(payload: LoginPayload): Promise<{ user: ApiUser; token: string }> {
+    return request("/api/auth/login", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  register(payload: RegisterPayload): Promise<{ user: ApiUser; token: string }> {
+    return request("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  logout(): Promise<{ ok: true }> {
+    return request("/api/auth/logout", { method: "POST" });
+  },
+
+  me(): Promise<{ user: ApiUser }> {
+    return request("/api/auth/me");
+  },
+
+  listResumes(): Promise<{ resumes: ApiResumeSummary[] }> {
+    return request("/api/resumes");
+  },
+
+  getResume(id: string): Promise<{ resume: ApiResume }> {
+    return request(`/api/resumes/${id}`);
+  },
+
+  createResume(payload: CreateResumePayload): Promise<{ resume: ApiResume }> {
+    return request("/api/resumes", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  updateResume(
+    id: string,
+    payload: { title?: string; document?: unknown },
+  ): Promise<{ resume: ApiResumeSummary }> {
+    return request(`/api/resumes/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  deleteResume(id: string): Promise<{ ok: true }> {
+    return request(`/api/resumes/${id}`, { method: "DELETE" });
+  },
+
+  adminOverview(): Promise<{ stats: { users: number; resumes: number; activeSessions: number } }> {
+    return request("/api/admin/overview");
+  },
+
+  adminUsers(): Promise<{ users: ApiUser[] }> {
+    return request("/api/admin/users");
+  },
+
+  adminResumes(): Promise<{ resumes: (ApiResumeSummary & { ownerEmail: string })[] }> {
+    return request("/api/admin/resumes");
+  },
+};

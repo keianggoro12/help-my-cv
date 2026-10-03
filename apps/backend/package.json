@@ -1,0 +1,22 @@
+{
+  "name": "@helpmycv/backend",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev --local --persist-to=.wrangler/state --port 8788",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@helpmycv/shared": "*",
+    "hono": "^4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250204.0",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.9.0"
+  }
+}

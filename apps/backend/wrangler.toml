@@ -1,0 +1,21 @@
+name = "helpmycv-backend"
+compatibility_date = "2025-02-04"
+main = "src/index.ts"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "helpmycv"
+database_id = "local-helpmycv"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "helpmycv"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "helpmycv"
+database_id = "REPLACE_WITH_PRODUCTION_D1_ID"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "helpmycv"

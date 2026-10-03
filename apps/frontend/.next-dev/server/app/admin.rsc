@@ -1,0 +1,18 @@
+1:"$Sreact.fragment"
+2:I[3276,["276","static/chunks/276-b292c7f1ac33d9d5.js","177","static/chunks/app/layout-865e56f16b445878.js"],"SessionProvider"]
+3:I[5341,[],""]
+4:I[25,[],""]
+5:I[9664,["664","static/chunks/664-6d821dc1aacb6b48.js","345","static/chunks/app/not-found-43c9e7d8a1430580.js"],""]
+6:I[2928,["118","static/chunks/118-b0482b974db39197.js","276","static/chunks/276-b292c7f1ac33d9d5.js","698","static/chunks/app/admin/page-97085ca6697d1ff2.js"],"AdminLoginPage"]
+7:I[5104,[],"OutletBoundary"]
+9:I[7158,[],"AsyncMetadataOutlet"]
+b:I[5104,[],"ViewportBoundary"]
+d:I[5104,[],"MetadataBoundary"]
+e:"$Sreact.suspense"
+10:I[4431,[],""]
+:HL["/_next/static/css/76c7d83e4272fccb.css","style"]
+0:{"P":null,"b":"vEvjFy0Sp-BvHjUhBgCA2","p":"","c":["","admin"],"i":false,"f":[[["",{"children":["admin",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/76c7d83e4272fccb.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"\n(function () {\n  try {\n    var stored = localStorage.getItem(\"helpmycv:theme\");\n    var prefersDark = window.matchMedia(\"(prefers-color-scheme: dark)\").matches;\n    if (stored === \"dark\" || (!stored && prefersDark)) {\n      document.documentElement.classList.add(\"dark\");\n    }\n  } catch (e) {}\n})();\n"}}]}],["$","body",null,{"children":["$","$L2",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[["$","main",null,{"className":"flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center","children":[["$","p",null,{"className":"text-4xl font-bold text-foreground","children":"404"}],["$","$L5",null,{"href":"/","className":"text-sm text-primary underline-offset-4 hover:underline","children":"Help My CV"}]]}],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]}]]}]]}],{"children":["admin",["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],{"children":["__PAGE__",["$","$1","c",{"children":[["$","$L6",null,{}],null,["$","$L7",null,{"children":["$L8",["$","$L9",null,{"promise":"$@a"}]]}]]}],{},null,false]},null,false]},null,false],["$","$1","h",{"children":[null,[["$","$Lb",null,{"children":"$Lc"}],null],["$","$Ld",null,{"children":["$","div",null,{"hidden":true,"children":["$","$e",null,{"fallback":null,"children":"$Lf"}]}]}]]}],false]],"m":"$undefined","G":["$10",[]],"s":false,"S":true}
+c:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+8:null
+a:{"metadata":[["$","title","0",{"children":"Help My CV"}],["$","meta","1",{"name":"description","content":"We only help your CV, not your career."}]],"error":null,"digest":"$undefined"}
+f:"$a:metadata"

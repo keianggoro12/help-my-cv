@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/resumes/layout,_N_T_/admin/resumes/page,_N_T_/admin/resumes"
+  },
+  "routeCache": {
+    "key": "/route-cache/APP_PAGE/3c5130be0765d6d47a68ef1d3fb1ee7c67f5e0c09db883eaf0d5bb90e6af759a/$/admin/resumes",
+    "owner": {
+      "kind": "APP_PAGE",
+      "sourceRoute": "/admin/resumes/page"
+    },
+    "isFallback": false
+  }
+}
