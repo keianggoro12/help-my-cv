@@ -14,7 +14,7 @@ bucket_name = "helpmycv"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "helpmycv"
-database_id = "REPLACE_WITH_PRODUCTION_D1_ID"
+database_id = "531e5932-7518-4e2c-83bf-2aa86822be85"
 
 [[env.production.r2_buckets]]
 binding = "R2"

@@ -13,7 +13,7 @@ NEXT_PUBLIC_API_URL = "https://helpmycv-backend.keianggoro12.workers.dev"
 # directly; this binding is what makes the rewrite reach the backend.
 [[services]]
 binding = "BACKEND"
-service = "helpmycv-backend"
+service = "helpmycv-backend-production"
 
 [observability]
 enabled = true
