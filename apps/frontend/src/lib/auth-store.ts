@@ -131,14 +131,17 @@ export function updateProfile(userId: string, patch: Partial<UserProfile>): User
   }
 
   const updated: UserProfile = { ...entry, ...patch, id: entry.id, role: entry.role };
-  writeJson(STORAGE_KEYS.users, {
-    ...users,
-    [updated.email]: updated,
-    // The email can be part of the patch, so re-key the old entry too.
-    ...(patch.email && patch.email !== entry.email
-      ? { [patch.email.toLowerCase()]: { ...updated, email: patch.email.toLowerCase() } }
-      : {}),
-  });
+  const next = { ...users };
+  // remove old key if email changed
+  if (patch.email && patch.email.toLowerCase() !== entry.email.toLowerCase()) {
+    delete next[entry.email.toLowerCase()];
+    const emailKey = patch.email.toLowerCase();
+    next[emailKey] = { ...updated, email: emailKey };
+  } else {
+    next[entry.email.toLowerCase()] = updated;
+  }
+
+  writeJson(STORAGE_KEYS.users, next);
 
   if (getSession()?.id === userId) {
     writeJson(STORAGE_KEYS.session, updated);

@@ -15,8 +15,8 @@ function normaliseEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function toApiUser(row: { id: string; email: string; name: string; role: string }): ApiUser {
-  return { id: row.id, email: row.email, name: row.name, role: row.role === "admin" ? "admin" : "user" };
+function toApiUser(row: { id: string; email: string; name: string; role: string; image_url?: string | null }): ApiUser {
+  return { id: row.id, email: row.email, name: row.name, role: row.role === "admin" ? "admin" : "user", imageUrl: row.image_url ?? null } as ApiUser;
 }
 
 export async function handleRegister(env: Env, request: Request): Promise<Response> {
@@ -61,10 +61,10 @@ export async function handleLogin(env: Env, request: Request): Promise<Response>
 
   const email = normaliseEmail(payload.email ?? "");
   const row = await env.DB.prepare(
-    "SELECT id, email, name, role, password_hash FROM users WHERE email = ?",
+    "SELECT id, email, name, role, password_hash, image_url FROM users WHERE email = ?",
   )
     .bind(email)
-    .first<{ id: string; email: string; name: string; role: string; password_hash: string }>();
+    .first<{ id: string; email: string; name: string; role: string; password_hash: string; image_url?: string | null }>();
 
   // Hash even when the account is unknown, so a missing email and a wrong
   // password take the same time and cannot be told apart by timing.
