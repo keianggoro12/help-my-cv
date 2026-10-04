@@ -60,7 +60,13 @@ export function ResumeBuilderPage() {
     }
     setCreatePending(true);
     try {
-      const resume = await createBlankResume(user.id, title, templateId, user.email);
+      const resume = await createBlankResume(
+        user.id,
+        title,
+        templateId,
+        user.email,
+        { fullName: user.name, email: user.email, phone: user.phone },
+      );
       setCreateOpen(false);
       router.push(`/user/${resume.id}/edit`);
     } catch (error) {
