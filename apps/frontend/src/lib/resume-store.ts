@@ -17,7 +17,7 @@
  * only writer of record — never the cache.
  */
 
-import type { ExperienceEntry, PersonalInfo, Resume, ResumeTemplateId } from "@helpmycv/shared";
+import type { ExperienceEntry, Resume, ResumeTemplateId } from "@helpmycv/shared";
 import {
   DEFAULT_SECTION_ORDER,
   createResume,
@@ -471,42 +471,20 @@ export async function createBlankResume(
   title: string,
   templateId: ResumeTemplateId,
   email?: string,
-  personal?: Partial<PersonalInfo>,
 ): Promise<Resume> {
   if (API_ENABLED) {
     // The server mints the id, so the client cannot predict the row it is about
     // to insert — the returned id is what the editor route has to open.
     const { resume } = await api.createResume({ title });
     const document = migrateResume(resume.document);
-    // Pre-fill the identity fields from the signed-in user, then persist. The
-    // server's document is a blank slate, so without this the editor opened with
-    // empty name/email/phone even though the user had already filled them in on
-    // their profile — every CV had to be re-typed from scratch. Only the fields
-    // the document leaves empty are seeded, so a template that does supply a
-    // value keeps it.
-    const seeded: Resume = { ...document, personal: { ...document.personal, ...compactPersonal(personal) } };
-    const saved = await saveResume(seeded);
-    cacheResumes(userId, [saved, ...listResumes(userId).filter((r) => r.id !== saved.id)]);
-    return saved;
+    cacheResumes(userId, [document, ...listResumes(userId).filter((r) => r.id !== document.id)]);
+    return document;
   }
 
   const resume = createResume({ id: createId("cv"), userId, title, templateId, email });
-  const seeded: Resume = { ...resume, personal: { ...resume.personal, ...compactPersonal(personal) } };
   const map = loadResumes();
-  saveResumes({ ...map, [userId]: [seeded, ...(map[userId] ?? [])] });
-  return seeded;
-}
-
-/**
- * Drops empty values so seeding cannot overwrite a template's own content with
- * blanks, and so the offline and online paths seed exactly the same fields.
- */
-function compactPersonal(personal?: Partial<PersonalInfo>): Partial<PersonalInfo> {
-  if (!personal) {
-    return {};
-  }
-  const entries = Object.entries(personal).filter(([, value]) => value !== undefined && value !== "");
-  return Object.fromEntries(entries) as Partial<PersonalInfo>;
+  saveResumes({ ...map, [userId]: [resume, ...(map[userId] ?? [])] });
+  return resume;
 }
 
 export async function saveResume(resume: Resume): Promise<Resume> {
