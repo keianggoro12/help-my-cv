@@ -44,6 +44,14 @@ export interface SectionSchema {
   fields: EntryField[];
   /** Whether entries of this section carry bullet lists. */
   bullets: boolean;
+  /**
+   * Label above the bullet list, for sections where `bullets` is true.
+   *
+   * Per-section rather than one shared string because what the bullets describe
+   * differs: a school entry's bullets are a description of the course, a job
+   * entry's are responsibilities. A single "About me" was wrong for all of them.
+   */
+  bulletsLabel: TranslationKey;
   emptyKey: TranslationKey;
 }
 
@@ -51,6 +59,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
   {
     key: "education",
     bullets: true,
+    bulletsLabel: "editor.bulletsEducation",
     emptyKey: "editor.emptyEducation",
     fields: [
       { kind: "text", key: "institution", label: "field.institution", grow: true },
@@ -63,6 +72,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
   {
     key: "experience",
     bullets: true,
+    bulletsLabel: "editor.bulletsExperience",
     emptyKey: "editor.emptyExperience",
     fields: [
       { kind: "text", key: "company", label: "field.company", grow: true },
@@ -76,6 +86,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
     key: "skills",
     // A skill is a noun with an optional level; there is nothing to narrate.
     bullets: false,
+    bulletsLabel: "editor.bulletsSkills",
     emptyKey: "editor.emptySkills",
     fields: [
       { kind: "text", key: "name", label: "field.skill", grow: true },
@@ -85,6 +96,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
   {
     key: "projects",
     bullets: true,
+    bulletsLabel: "editor.bulletsProjects",
     emptyKey: "editor.emptyProjects",
     fields: [
       { kind: "text", key: "name", label: "field.project", grow: true },
@@ -95,6 +107,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
   {
     key: "achievements",
     bullets: true,
+    bulletsLabel: "editor.bulletsAchievements",
     emptyKey: "editor.emptyAchievements",
     fields: [
       { kind: "text", key: "title", label: "field.title", grow: true },
@@ -106,6 +119,7 @@ export const SECTION_SCHEMAS: SectionSchema[] = [
   {
     key: "certifications",
     bullets: false,
+    bulletsLabel: "editor.bulletsCertifications",
     emptyKey: "editor.emptyCertifications",
     fields: [
       { kind: "text", key: "name", label: "field.name", grow: true },

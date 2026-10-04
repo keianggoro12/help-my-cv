@@ -107,7 +107,9 @@ export function EntryCard({
 
       {schema.bullets ? (
         <div className="space-y-2">
-          <FieldLabel>{t("field.summary")}</FieldLabel>
+          {/* Per-section label: what the bullets describe differs by section, so
+              "About me" (the Personal Information summary) is not reused here. */}
+          <FieldLabel>{t(schema.bulletsLabel)}</FieldLabel>
           <BulletList
             bullets={draft.bullets}
             onChange={(bullets) => patch({ bullets })}
