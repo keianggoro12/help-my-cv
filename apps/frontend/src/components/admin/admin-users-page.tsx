@@ -1,24 +1,43 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
-import { readJson, STORAGE_KEYS } from "@/lib/storage";
+import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { UserProfile } from "@helpmycv/shared";
 
-/** Read-only user list. Role changes and moderation are out of phase 1 scope. */
 export function AdminUsersPage() {
   const { t, locale } = useSession();
   const [users, setUsers] = React.useState<UserProfile[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    setUsers(
-      Object.values(readJson<Record<string, UserProfile>>(STORAGE_KEYS.users, {})).sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-    );
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.adminUsers();
+        if (cancelled) return;
+        setUsers(
+          (res.users ?? []).map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            phone: "",
+            imageUrl: u.imageUrl ?? null,
+            createdAt: new Date().toISOString(),
+          })),
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -40,19 +59,28 @@ export function AdminUsersPage() {
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className="border-b last:border-0">
-                <td className="px-5 py-3 font-medium text-foreground">{user.name}</td>
+                <td className="px-5 py-3 font-medium text-foreground">
+                  <Link href={`/user/${user.id}/edit`} className="hover:underline">
+                    {user.name}
+                  </Link>
+                </td>
                 <td className="px-5 py-3 text-muted-foreground">{user.email}</td>
                 <td className="px-5 py-3 text-muted-foreground">{user.phone}</td>
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2">
                     <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(user.createdAt, locale)}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{formatDate(user.createdAt, locale)}</span>
                   </div>
                 </td>
               </tr>
             ))}
+            {users.length === 0 && !loading && (
+              <tr>
+                <td colSpan={4} className="px-5 py-8 text-center text-sm text-muted-foreground">
+                  {t("admin.emptyResumes")}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

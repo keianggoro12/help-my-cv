@@ -3,31 +3,41 @@
 import * as React from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { api, API_ENABLED } from "@/lib/api-client";
 import { readJson, STORAGE_KEYS } from "@/lib/storage";
 import type { UserProfile } from "@helpmycv/shared";
 
-/**
- * Admin dashboard.
- *
- * The PRD's admin scope for phase 1 is only "there is an admin dashboard", so
- * this reads the mock user store directly and shows real counts from it rather
- * than inventing a stats API. Every number here is derived from the same
- * localStorage the user side writes to, so the admin view and the user view
- * cannot disagree.
- */
 export function AdminDashboardPage() {
   const { t } = useSession();
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [resumeCount, setResumeCount] = React.useState(0);
 
   React.useEffect(() => {
-    const store = readJson<Record<string, UserProfile[]>>(STORAGE_KEYS.resumes, {});
-    setUsers(Object.values(readJson<Record<string, UserProfile>>(STORAGE_KEYS.users, {})));
-    setResumeCount(Object.values(store).reduce((total, list) => total + list.length, 0));
+    let cancelled = false;
+    (async () => {
+      if (API_ENABLED) {
+        try {
+          const res = await api.adminOverview();
+          if (cancelled) return;
+          setUsers([]);
+          setResumeCount(res.stats.resumes);
+        } catch (e) {
+          console.error("admin overview", e);
+        }
+        return;
+      }
+      const store = readJson<Record<string, UserProfile[]>>(STORAGE_KEYS.resumes, {});
+      if (cancelled) return;
+      setUsers(Object.values(readJson<Record<string, UserProfile>>(STORAGE_KEYS.users, {})));
+      setResumeCount(Object.values(store).reduce((total, list) => total + list.length, 0));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = [
-    { label: t("admin.users"), value: users.length },
+    { label: t("admin.users"), value: API_ENABLED ? 0 : users.length },
     { label: t("admin.resumes"), value: resumeCount },
   ];
 
