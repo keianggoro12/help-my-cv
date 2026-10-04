@@ -1,9 +1,14 @@
 -- Demo accounts for local development and the first production deploy.
 --
--- The hashes are PBKDF2-SHA256, 210000 iterations, matching
--- src/lib/password.ts. They are committed deliberately: these two accounts
--- exist only to make a fresh database usable, and their passwords are
--- published here anyway.
+-- The hashes are PBKDF2-SHA256, 100000 iterations, matching
+-- src/lib/password.ts. That count is not a free choice: workerd caps PBKDF2 at
+-- 100000 and throws `NotSupportedError: iteration counts above 100000 are not
+-- supported` for anything higher, which turned every registration into a 500.
+-- They are committed deliberately: these two accounts exist only to make a
+-- fresh database usable, and their passwords are published here anyway.
+--
+-- 0007 re-seeds these two accounts at the same iteration count, so a database
+-- created from an older revision of this file still ends up able to log in.
 --
 -- INSERT OR IGNORE keys off the email unique index, so re-applying the
 -- migration does not error and does not reset a password that was changed

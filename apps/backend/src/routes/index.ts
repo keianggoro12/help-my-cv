@@ -5,7 +5,7 @@ import type { Env } from "../lib/helpers";
 import { json } from "../lib/helpers";
 import type { AppVariables } from "../middleware/auth";
 import { requireAdmin, requireAuth } from "../middleware/auth";
-import { handleLogin, handleLogout, handleRegister } from "./auth";
+import { handleLogin, handleLogout, handleRegister, handleUpdateProfile } from "./auth";
 import {
   deleteUser,
   listAllResumes,
@@ -30,6 +30,9 @@ export const authRoutes = new Hono<AppEnv>();
 authRoutes.post("/register", (c) => handleRegister(c.env, c.req.raw));
 authRoutes.post("/login", (c) => handleLogin(c.env, c.req.raw));
 authRoutes.post("/logout", (c) => handleLogout(c.env, c.req.raw));
+// Profile edits need a session, so this one sits behind the guard rather than
+// answering 401 itself like `/me` does.
+authRoutes.patch("/me", requireAuth, (c) => handleUpdateProfile(c.env, c.req.raw, c.get("user")));
 authRoutes.get("/me", (c) => {
   const user = c.get("user");
   // No middleware here on purpose: `/me` has to answer 401 for an absent

@@ -97,6 +97,7 @@ const en = {
   "profile.uploading": "Uploading…",
   "profile.photoHint": "JPG, PNG, WebP or GIF up to 5 MB.",
   "profile.photoUpdated": "Profile photo updated",
+  "profile.saveFailed": "Could not save your profile",
 
   "resume.chooseTemplateTitle": "Start from a template",
   "resume.chooseTemplateSubtitle": "Pick a starting point. You can change sections later.",
@@ -301,6 +302,7 @@ const id: Record<TranslationKey, string> = {
   "profile.uploading": "Mengunggah…",
   "profile.photoHint": "JPG, PNG, WebP atau GIF maksimal 5 MB.",
   "profile.photoUpdated": "Foto profil diperbarui",
+  "profile.saveFailed": "Profil kamu gagal disimpan",
 
   "resume.chooseTemplateTitle": "Mulai dari template",
   "resume.chooseTemplateSubtitle": "Pilih titik awal. Section bisa diubah nanti.",

@@ -77,8 +77,12 @@ function loadPasswords(): PasswordMap {
  * number typed into the profile page is not thrown away by a re-login, and the
  * two values the API cannot supply get harmless defaults rather than `NaN`
  * reaching `toLocaleDateString`.
+ *
+ * `phoneHint` is what the register form collected on a fresh sign-up: the
+ * backend discards it, so without this the field would come back empty on the
+ * very first render of the profile page.
  */
-function toUserProfile(apiUser: ApiUser): UserProfile {
+function toUserProfile(apiUser: ApiUser, phoneHint?: string): UserProfile {
   const existing = loadUsers()[apiUser.email];
   return {
     id: apiUser.id,
@@ -86,7 +90,7 @@ function toUserProfile(apiUser: ApiUser): UserProfile {
     email: apiUser.email,
     role: apiUser.role,
     imageUrl: apiUser.imageUrl ?? existing?.imageUrl ?? null,
-    phone: existing?.phone ?? "",
+    phone: existing?.phone ?? phoneHint ?? "",
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -145,13 +149,37 @@ export async function register(input: RegistrationInput): Promise<AuthResult> {
   }
 
   const email = input.email.trim().toLowerCase();
-  const users = loadUsers();
+  const password = input.password;
 
+  // With the API live the backend owns the account list, so an address it has
+  // never seen is the only thing "taken" can mean. Checking the local mock store
+  // first would reject addresses the server does not have, and — worse — the
+  // local write below used to publish a session before the token existed, which
+  // raced the dashboard's first `GET /api/resumes` into a 401 that then wiped
+  // the token and logged the new user straight back out.
+  if (API_ENABLED) {
+    let result: Awaited<ReturnType<typeof api.register>>;
+    try {
+      result = await api.register({ name: input.name.trim(), email, password });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        return { ok: false, error: "emailTaken" };
+      }
+      throw error;
+    }
+    // Token first, then the session: the session write is what makes the app
+    // start fetching, and those fetches need the token to already be there.
+    writeToken(result.token);
+    const user = toUserProfile(result.user, input.phone.trim());
+    writeJson(STORAGE_KEYS.session, user);
+    return { ok: true, user };
+  }
+
+  const users = loadUsers();
   if (users[email]) {
     return { ok: false, error: "emailTaken" };
   }
 
-  const now = new Date().toISOString();
   const newUser: UserProfile = {
     id: createId("usr"),
     name: input.name.trim(),
@@ -159,22 +187,12 @@ export async function register(input: RegistrationInput): Promise<AuthResult> {
     phone: input.phone.trim(),
     role: "user",
     imageUrl: null,
-    createdAt: now,
+    createdAt: new Date().toISOString(),
   };
 
-  const updatedUsers = { ...users, [email]: newUser };
-  writeJson(STORAGE_KEYS.users, updatedUsers);
-  writeJson(STORAGE_KEYS.passwords, { ...loadPasswords(), [email]: input.password });
+  writeJson(STORAGE_KEYS.users, { ...users, [email]: newUser });
+  writeJson(STORAGE_KEYS.passwords, { ...loadPasswords(), [email]: password });
   writeJson(STORAGE_KEYS.session, newUser);
-
-  // If API enabled, also register on backend
-  if (API_ENABLED) {
-    const result = await api.register({ name: input.name.trim(), email, password: input.password });
-    writeToken(result.token);
-    const updatedUser = { ...newUser, ...result.user };
-    writeJson(STORAGE_KEYS.session, updatedUser);
-    return { ok: true, user: updatedUser };
-  }
 
   return { ok: true, user: newUser };
 }
@@ -191,29 +209,64 @@ export function signOut(): void {
   }
 }
 
-export function updateProfile(userId: string, patch: Partial<UserProfile>): UserProfile | null {
+/**
+ * Applies a profile edit.
+ *
+ * With the API live this writes to D1 as well as the local mirror. It used to be
+ * localStorage-only, so a name or avatar change was invisible on every other
+ * device and vanished on sign-out — the profile page looked like it saved and
+ * nothing was stored. `phone` stays local: the `users` table has no column for
+ * it, so it is kept per browser and merged back on the next load.
+ *
+ * Only `name` and `imageUrl` are sent, and the server ignores `role` and
+ * `email` regardless — a profile page must not be able to promote itself.
+ */
+export async function updateProfile(
+  userId: string,
+  patch: Partial<Pick<UserProfile, "name" | "phone" | "imageUrl">>,
+): Promise<UserProfile | null> {
   const users = loadUsers();
-  const entry = Object.values(users).find((candidate) => candidate.id === userId);
+  // Fall back to the live session when the id is absent from the local user map.
+  // With the API enabled the map is only ever written by the offline register
+  // path, so a user who signed up against the backend has a session but no entry
+  // here. Bailing out in that case made every profile save a silent no-op: the
+  // page reported nothing, no request was made, and the edit was lost — the
+  // "update profile doesn't work" symptom. The session is the authority for who
+  // is signed in, so it is the right seed when the mirror has not caught up.
+  const session = getSession();
+  const entry =
+    Object.values(users).find((candidate) => candidate.id === userId) ??
+    (session?.id === userId ? session : undefined);
   if (!entry) {
     return null;
   }
 
-  const updated: UserProfile = { ...entry, ...patch, id: entry.id, role: entry.role };
-  const next = { ...users };
-  // remove old key if email changed
-  if (patch.email && patch.email.toLowerCase() !== entry.email.toLowerCase()) {
-    delete next[entry.email.toLowerCase()];
-    const emailKey = patch.email.toLowerCase();
-    next[emailKey] = { ...updated, email: emailKey };
-  } else {
-    next[entry.email.toLowerCase()] = updated;
+  const local: UserProfile = { ...entry, ...patch, id: entry.id, role: entry.role };
+
+  if (API_ENABLED) {
+    // Name and avatar go to the server; `phone` has no column, so it is only
+    // merged locally below. Omitting `imageUrl` when it was not edited keeps a
+    // name-only save from clearing the stored avatar.
+    const payload: { name?: string; imageUrl?: string | null } = { name: local.name };
+    if (patch.imageUrl !== undefined) {
+      payload.imageUrl = patch.imageUrl;
+    }
+    const { user } = await api.updateProfile(payload);
+    local.name = user.name;
+    if (user.imageUrl !== undefined) {
+      local.imageUrl = user.imageUrl;
+    }
   }
 
+  // Mirror into the local store so the profile page and `toUserProfile` see the
+  // same values without waiting for a round trip.
+  const next = { ...users };
+  next[local.email.toLowerCase()] = local;
   writeJson(STORAGE_KEYS.users, next);
 
   if (getSession()?.id === userId) {
-    writeJson(STORAGE_KEYS.session, updated);
+    writeJson(STORAGE_KEYS.session, local);
   }
 
-  return updated;
+  return local;
 }

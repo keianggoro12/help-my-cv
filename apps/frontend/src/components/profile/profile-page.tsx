@@ -29,9 +29,11 @@ function AvatarPreview({ name, imageUrl }: { name: string; imageUrl: string | nu
 /** Name / phone editor. Email and password changes are out of phase 1 scope. */
 export function ProfilePage() {
   const { user, refresh, t, locale } = useSession();
+  const { toast } = useToast();
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [saved, setSaved] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -62,37 +64,72 @@ export function ProfilePage() {
         // an <img src> against the same origin that served this page.
         const url = data?.url;
         if (url) {
-          updateProfile(user.id, { imageUrl: url });
-          refresh();
+          // Awaited: `updateProfile` now writes the new avatar URL to D1, so a
+          // failure here has to be reported instead of leaving the session
+          // pointing at a picture the server never recorded.
+          await updateProfile(user.id, { imageUrl: url });
+          await refresh();
           toast({ type: "success", title: t("profile.photoUpdated") });
           return;
         }
       }
-      // Fallback to data URL if upload failed
+      // Fallback to data URL if upload failed. Only reachable when R2 itself
+      // rejected the file — a 401 here means the session died mid-flow, and
+      // storing the bytes locally would paper over that.
       const reader = new FileReader();
-      reader.onload = () => {
-        updateProfile(user.id, { imageUrl: reader.result as string });
-        refresh();
-        toast({ type: "success", title: t("profile.photoUpdated") });
+      reader.onload = async () => {
+        try {
+          await updateProfile(user.id, { imageUrl: reader.result as string });
+          await refresh();
+          toast({ type: "success", title: t("profile.photoUpdated") });
+        } catch (error) {
+          toast({
+            type: "error",
+            title: t("profile.saveFailed"),
+            message: error instanceof Error ? error.message : undefined,
+          });
+        }
       };
       reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        type: "error",
+        title: t("profile.saveFailed"),
+        message: error instanceof Error ? error.message : undefined,
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
-  const { toast } = useToast();
-
-  function handleSave(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) {
       return;
     }
-    updateProfile(user.id, { name: name.trim() || user.name, phone: phone.trim() });
-    refresh();
-    setSaved(true);
-    toast({ type: "success", title: t("resume.saved") });
+    setSaving(true);
+    setSaved(false);
+    try {
+      // Waits for the backend write: `updateProfile` is async now and throws if
+      // the API rejects the change, so a success toast can only appear once the
+      // new name is actually in D1. Without the await this reported success for
+      // edits that were never stored.
+      const next = await updateProfile(user.id, { name: name.trim() || user.name, phone: phone.trim() });
+      if (next) {
+        await refresh();
+        setSaved(true);
+        toast({ type: "success", title: t("resume.saved") });
+      }
+    } catch (error) {
+      toast({
+        type: "error",
+        title: t("profile.saveFailed"),
+        message: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (!user) {

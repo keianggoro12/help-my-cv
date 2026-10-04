@@ -80,6 +80,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body !== undefined) {
     headers.set("Content-Type", "application/json");
   }
+  // Attach the session token only when there is one. Sending
+  // `Authorization: Bearer null` was equivalent to sending nothing, so this is
+  // only a readability fix — the real cause of the signup 401 is in
+  // `register()`, which used to publish the local session before writing the
+  // token: the dashboard's first `GET /api/resumes` then raced ahead with no
+  // token, drew a 401, and the branch below deleted the token that had just
+  // arrived, logging the brand-new user straight back out.
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -92,9 +99,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const code = (payload as { error?: string } | null)?.error ?? "request_failed";
-    // An expired or revoked token is not a retryable failure: drop it so the
-    // next call goes through the sign-in path instead of looping on 401.
-    if (response.status === 401) {
+    // Only a 401 that was *answered* about a token we actually sent means the
+    // session is dead. A 401 for a request that carried no token says nothing
+    // about any session — it usually means the caller fired before `writeToken`
+    // ran — so clearing here would destroy a perfectly good token and turn a
+    // transient ordering problem into a logout. Checking `token` distinguishes
+    // the two cases exactly.
+    if (response.status === 401 && token) {
       writeToken(null);
     }
     throw new ApiError(response.status, code);
@@ -118,6 +129,17 @@ export const api = {
 
   me(): Promise<{ user: ApiUser }> {
     return request("/api/auth/me");
+  },
+
+  /**
+   * Updates the signed-in user's own name and avatar.
+   *
+   * There is no id in the path: the server always edits the caller's row, so a
+   * client cannot address somebody else's profile. Omitting `imageUrl` leaves
+   * the stored avatar untouched, which is what a name-only save needs.
+   */
+  updateProfile(payload: { name?: string; imageUrl?: string | null }): Promise<{ user: ApiUser }> {
+    return request("/api/auth/me", { method: "PATCH", body: JSON.stringify(payload) });
   },
 
   listResumes(): Promise<{ resumes: ApiResumeSummary[] }> {

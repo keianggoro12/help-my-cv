@@ -3,7 +3,7 @@ import type { ApiUser, LoginPayload, RegisterPayload } from "@helpmycv/shared";
 import { hashPassword, verifyPassword } from "../lib/password";
 import type { Env } from "../lib/helpers";
 import { json } from "../lib/helpers";
-import { bearerToken, createSession, deleteSession } from "../lib/session";
+import { bearerToken, createSession, deleteSession, type SessionUser } from "../lib/session";
 
 function newId(): string {
   const bytes = new Uint8Array(12);
@@ -93,6 +93,54 @@ export async function handleLogin(env: Env, request: Request): Promise<Response>
  */
 const DUMMY_HASH =
   "pbkdf2_sha256$100000$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000";
+
+/**
+ * Updates the signed-in user's own name and avatar.
+ *
+ * `email` is deliberately not updatable — it is the login identity and the key
+ * every other table references, so changing it is an account migration, not a
+ * profile edit. The route takes no id from the body either: the row is always
+ * the caller's own session, so there is nothing to escalate by guessing.
+ *
+ * `phone` is accepted and acknowledged but not stored: the `users` table has no
+ * such column. Returning it lets the client keep the value locally without a
+ * second round trip, and the field is documented as mock-only in the shared
+ * types.
+ */
+export async function handleUpdateProfile(env: Env, request: Request, user: SessionUser): Promise<Response> {
+  let payload: { name?: string; imageUrl?: string | null };
+  try {
+    payload = (await request.json()) as { name?: string; imageUrl?: string | null };
+  } catch {
+    return json({ error: "invalid_body" }, 400);
+  }
+
+  const name = (payload.name ?? "").trim();
+  if (name === "") {
+    return json({ error: "invalid_input" }, 422);
+  }
+
+  // Only overwrite the avatar when the client actually sent the field: an
+  // omitted `imageUrl` means "leave it alone", not "clear it".
+  const hasImage = Object.prototype.hasOwnProperty.call(payload, "imageUrl");
+  const imageUrl = hasImage ? payload.imageUrl ?? null : undefined;
+
+  const result = imageUrl === undefined
+    ? await env.DB.prepare("UPDATE users SET name = ? WHERE id = ?").bind(name, user.id).run()
+    : await env.DB.prepare("UPDATE users SET name = ?, image_url = ? WHERE id = ?")
+        .bind(name, imageUrl, user.id)
+        .run();
+
+  if (!result.meta.changes) {
+    return json({ error: "not_found" }, 404);
+  }
+
+  const row = await env.DB.prepare("SELECT id, email, name, role, image_url FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<{ id: string; email: string; name: string; role: string; image_url?: string | null }>();
+
+  return json({ user: row ? toApiUser(row) : null });
+}
 
 export async function handleLogout(env: Env, request: Request): Promise<Response> {
   const token = bearerToken(request.headers.get("Authorization"));

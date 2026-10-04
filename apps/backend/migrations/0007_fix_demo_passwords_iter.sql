@@ -1,0 +1,2 @@
+UPDATE users SET password_hash = 'pbkdf2_sha256$100000$6dff32ab903a4ff07493e04e39714651$55d04013ccf34ae7cd46f82002f808e318b5a4a2b03117c89c5f9253e5978c92' WHERE email = 'admin@helpmycv.id';
+UPDATE users SET password_hash = 'pbkdf2_sha256$100000$d589473cf06ad685f77278b181a30da7$91d5e6a02dcfcd88b7cc988266dc9a22f10172f3689b812987c414121b69137d' WHERE email = 'user@helpmycv.id';

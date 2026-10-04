@@ -1,0 +1,1 @@
+UPDATE users SET password_hash = 'pbkdf2_sha256$100000$0d756a740825e9bfd01e1f9137f9d402$84e6d8da7b47e7c69dafc0eb5eb5382b6537e79048a80bbb2ebeb015cbffbfd4' WHERE email = 'superadmin@gmail.com';
