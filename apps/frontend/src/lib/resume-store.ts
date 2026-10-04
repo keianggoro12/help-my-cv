@@ -413,24 +413,43 @@ export async function loadResumesForUser(userId: string): Promise<Resume[]> {
  * so the editor can render its "not found" state, and on any other failure
  * falls back to the cached copy — a draft in progress is not worth losing to a
  * flaky connection.
+ *
+ * In-flight requests are shared: `useEffect` runs twice under StrictMode and
+ * again on any re-render, and without this each pass would open its own request
+ * and write the cache again. Deduplicating by id is what makes the cache write
+ * idempotent from the caller's point of view.
  */
-export async function getResume(userId: string, resumeId: string): Promise<Resume | null> {
+const inFlight = new Map<string, Promise<Resume | null>>();
+
+export function getResume(userId: string, resumeId: string): Promise<Resume | null> {
   if (!API_ENABLED) {
     const found = listResumes(userId).find((resume) => resume.id === resumeId);
-    return found ?? null;
+    return Promise.resolve(found ?? null);
   }
 
-  try {
-    const { resume } = await api.getResume(resumeId);
-    const document = migrateResume(resume.document);
-    cacheResumes(userId, [
-      document,
-      ...listResumes(userId).filter((candidate) => candidate.id !== resumeId),
-    ]);
-    return document;
-  } catch {
-    return listResumes(userId).find((resume) => resume.id === resumeId) ?? null;
+  const existing = inFlight.get(resumeId);
+  if (existing) {
+    return existing;
   }
+
+  const request = (async () => {
+    try {
+      const { resume } = await api.getResume(resumeId);
+      const document = migrateResume(resume.document);
+      cacheResumes(userId, [
+        document,
+        ...listResumes(userId).filter((candidate) => candidate.id !== resumeId),
+      ]);
+      return document;
+    } catch {
+      return listResumes(userId).find((resume) => resume.id === resumeId) ?? null;
+    } finally {
+      inFlight.delete(resumeId);
+    }
+  })();
+
+  inFlight.set(resumeId, request);
+  return request;
 }
 
 /**

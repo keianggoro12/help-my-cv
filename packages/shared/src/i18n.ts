@@ -114,6 +114,8 @@ const en = {
 
   "editor.title": "Edit CV",
   "editor.back": "Back to CVs",
+  "editor.loading": "Loading your CV…",
+  "editor.sessionExpired": "Your session ended. Sign in again to keep editing.",
   "editor.notFound": "CV not found.",
   "editor.notFoundBody": "It may have been deleted. Head back to your list of CVs.",
   "editor.personalLocked": "This section is always on and cannot be moved.",
@@ -316,6 +318,8 @@ const id: Record<TranslationKey, string> = {
 
   "editor.title": "Edit CV",
   "editor.back": "Kembali ke daftar CV",
+  "editor.loading": "Memuat CV kamu…",
+  "editor.sessionExpired": "Sesi kamu berakhir. Masuk lagi untuk melanjutkan.",
   "editor.notFound": "CV tidak ditemukan.",
   "editor.notFoundBody": "Mungkin sudah dihapus. Kembali ke daftar CV kamu.",
   "editor.personalLocked": "Section ini selalu aktif dan tidak bisa dipindahkan.",

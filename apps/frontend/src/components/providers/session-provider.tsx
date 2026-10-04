@@ -48,8 +48,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
   const [locale, setLocaleState] = React.useState<Locale>(DEFAULT_LOCALE);
 
+  /**
+   * Re-reads the session from storage.
+   *
+   * `getSession()` parses a fresh object every call, so passing it straight to
+   * `setUser` would change `user`'s identity on every storage event even when the
+   * session is byte-for-byte identical. Anything with `user` in a dependency
+   * array — the editor's load effect, the resume list — would then re-run each
+   * time. The session is only replaced when it actually differs.
+   */
   const refresh = React.useCallback(() => {
-    setUser(getSession());
+    setUser((current) => {
+      const next = getSession();
+      if (current && next && current.id === next.id && current.email === next.email) {
+        return current;
+      }
+      if (!current && !next) {
+        return current;
+      }
+      return next;
+    });
     setLoading(false);
   }, []);
 

@@ -208,8 +208,20 @@ export function EditorPage({ resumeId }: EditorPageProps) {
     );
   }
 
+  // The document is a network round trip, so this state is real and visible.
+  // Rendering `null` here produced a blank page with no spinner and no way to
+  // tell loading from broken — which is exactly what it looked like.
   if (!resume) {
-    return null;
+    return (
+      <div
+        className="flex min-h-[60vh] items-center justify-center gap-3 text-sm text-muted-foreground"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {t("editor.loading")}
+      </div>
+    );
   }
 
   const personalSection = resume.sections.find((section) => section.key === PERSONAL);
