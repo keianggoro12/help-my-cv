@@ -26,7 +26,7 @@ export function AdminResumesPage() {
             userId: r.userId,
             updatedAt: r.updatedAt,
             createdAt: (r as any).createdAt ?? r.updatedAt,
-            sections: [],
+            sections: [] as any,
             personal: {
               fullName: r.ownerEmail || "",
               role: "",
@@ -36,9 +36,9 @@ export function AdminResumesPage() {
               linkedin: "",
               website: "",
               summary: "",
-            },
+            } as any,
             ownerEmail: r.ownerEmail,
-          })) as Array<Resume & { ownerEmail: string }>,
+          } as any)),
         );
       } finally {
         if (!cancelled) setLoading(false);
