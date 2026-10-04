@@ -151,7 +151,9 @@ export const api = {
     return request("/api/admin/users");
   },
 
-  adminResumes(): Promise<{ resumes: (ApiResumeSummary & { ownerEmail: string })[] }> {
+  adminResumes(): Promise<{
+    resumes: (ApiResumeSummary & { ownerEmail: string; ownerName: string })[];
+  }> {
     return request("/api/admin/resumes");
   },
 };

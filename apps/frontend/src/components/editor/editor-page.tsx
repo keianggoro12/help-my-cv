@@ -70,12 +70,22 @@ export function EditorPage({ resumeId }: EditorPageProps) {
     if (loading || !user) {
       return;
     }
-    const found = getResume(user.id, resumeId);
-    if (found) {
-      setResume(found);
-    } else {
-      setNotFound(true);
-    }
+    // The full document is a request of its own: the list endpoint returns
+    // summaries only, so the editor cannot load a CV from the cached list.
+    let cancelled = false;
+    void getResume(user.id, resumeId).then((found) => {
+      if (cancelled) {
+        return;
+      }
+      if (found) {
+        setResume(found);
+      } else {
+        setNotFound(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loading, resumeId, user]);
 
   // Wide screens get the preview by default; narrow ones opt in, because two
@@ -151,20 +161,25 @@ export function EditorPage({ resumeId }: EditorPageProps) {
     patchSection(key, { entries: { kind: key, items: entries } as ResumeSection["entries"] });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!resume) {
       return;
     }
     setSaving(true);
-    // Deferred a tick so the spinner is actually painted; a synchronous
-    // localStorage write would finish before the browser could draw.
-    window.setTimeout(() => {
-      setResume(saveResume(resume));
-      setSaving(false);
+    try {
+      // Not deferred any more: with the API live this is a network round trip,
+      // so the spinner stays up for as long as it genuinely takes and a failure
+      // can be reported instead of silently showing a success that did not land.
+      setResume(await saveResume(resume));
       setDirty(false);
       setSaved(true);
       toast({ type: "success", title: t("resume.saved") });
-    }, 250);
+    } catch (error) {
+      console.error("save resume failed", error);
+      toast({ type: "error", title: t("resume.saveFailed") });
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleDownload() {

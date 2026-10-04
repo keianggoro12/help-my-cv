@@ -27,10 +27,17 @@ import { cn } from "@/lib/utils";
 interface CreateResumeDialogProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (templateId: ResumeTemplateId, title: string) => void;
+  /**
+   * Async because with the API live the row is inserted server-side and the id
+   * the editor needs only exists once the request resolves. Returning the
+   * promise lets the dialog keep the submit button disabled meanwhile.
+   */
+  onCreate: (templateId: ResumeTemplateId, title: string) => void | Promise<void>;
+  /** True while the create request is in flight. */
+  pending?: boolean;
 }
 
-export function CreateResumeDialog({ open, onClose, onCreate }: CreateResumeDialogProps) {
+export function CreateResumeDialog({ open, onClose, onCreate, pending = false }: CreateResumeDialogProps) {
   const { t } = useSession();
   const [step, setStep] = React.useState<"template" | "name">("template");
   const [template, setTemplate] = React.useState<ResumeTemplateId>("blank");
@@ -141,8 +148,8 @@ export function CreateResumeDialog({ open, onClose, onCreate }: CreateResumeDial
                 <ArrowLeft className="h-4 w-4" />
                 {t("resume.cancel")}
               </Button>
-              <Button type="submit" disabled={!title.trim()}>
-                {t("resume.continue")}
+              <Button type="submit" disabled={!title.trim() || pending}>
+                {pending ? t("resume.creating") : t("resume.continue")}
               </Button>
             </div>
           </form>

@@ -5,6 +5,7 @@ import { FileText, Plus } from "lucide-react";
 import * as React from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { CreateResumeDialog } from "@/components/resume/create-resume-dialog";
 import { ResumeCard } from "@/components/resume/resume-card";
 import type { Resume } from "@helpmycv/shared";
-import { createBlankResume, deleteResume, listResumes, renameResume } from "@/lib/resume-store";
+import { createBlankResume, deleteResume, loadResumesForUser, renameResume } from "@/lib/resume-store";
 
 /**
  * Resume Builder: the CV grid plus create / rename / delete.
@@ -25,22 +26,24 @@ export function ResumeBuilderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading, locale, t } = useSession();
+  const { toast } = useToast();
 
   const [resumes, setResumes] = React.useState<Resume[]>([]);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [createPending, setCreatePending] = React.useState(false);
   const [renameTarget, setRenameTarget] = React.useState<Resume | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [deleteTarget, setDeleteTarget] = React.useState<Resume | null>(null);
 
-  const refresh = React.useCallback(() => {
+  const refresh = React.useCallback(async () => {
     if (user) {
-      setResumes(listResumes(user.id));
+      setResumes(await loadResumesForUser(user.id));
     }
   }, [user]);
 
   React.useEffect(() => {
     if (!loading && user) {
-      refresh();
+      void refresh();
     }
   }, [loading, refresh, user]);
 
@@ -51,35 +54,57 @@ export function ResumeBuilderPage() {
     }
   }, [searchParams]);
 
-  function handleCreate(templateId: "blank" | "modern" | "classic" | "minimal", title: string) {
+  async function handleCreate(templateId: "blank" | "modern" | "classic" | "minimal", title: string) {
     if (!user) {
       return;
     }
-    const resume = createBlankResume(user.id, title, templateId, user.email);
-    setCreateOpen(false);
-    router.push(`/user/${resume.id}/edit`);
+    setCreatePending(true);
+    try {
+      const resume = await createBlankResume(user.id, title, templateId, user.email);
+      setCreateOpen(false);
+      router.push(`/user/${resume.id}/edit`);
+    } catch (error) {
+      // With the API live the id comes from the server, so a failed insert means
+      // there is no CV to open — say so instead of navigating to a dead route.
+      console.error("create resume failed", error);
+      toast({ type: "error", title: t("resume.createFailed") });
+    } finally {
+      setCreatePending(false);
+    }
   }
 
-  function handleRenameSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleRenameSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user || !renameTarget) {
       return;
     }
     const value = renameValue.trim();
     if (value) {
-      renameResume(user.id, renameTarget.id, value);
+      try {
+        await renameResume(user.id, renameTarget.id, value);
+      } catch (error) {
+        console.error("rename resume failed", error);
+        toast({ type: "error", title: t("resume.renameFailed") });
+        return;
+      }
     }
     setRenameTarget(null);
-    refresh();
+    void refresh();
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!user || !deleteTarget) {
       return;
     }
-    deleteResume(user.id, deleteTarget.id);
+    try {
+      await deleteResume(user.id, deleteTarget.id);
+    } catch (error) {
+      console.error("delete resume failed", error);
+      toast({ type: "error", title: t("resume.deleteFailed") });
+      return;
+    }
     setDeleteTarget(null);
-    refresh();
+    void refresh();
   }
 
   return (
@@ -129,6 +154,7 @@ export function ResumeBuilderPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreate={handleCreate}
+        pending={createPending}
       />
 
       <Dialog

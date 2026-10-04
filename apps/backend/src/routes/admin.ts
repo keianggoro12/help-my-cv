@@ -62,22 +62,46 @@ export async function listUsers(env: Env): Promise<Response> {
 
 export async function listAllResumes(env: Env): Promise<Response> {
   const { results } = await env.DB.prepare(
-    `SELECT r.id, r.user_id, r.title, r.created_at, r.updated_at, u.email
+    `SELECT r.id, r.user_id, r.title, r.document, r.created_at, r.updated_at, u.email, u.name
        FROM resumes r
        JOIN users u ON u.id = r.user_id
       ORDER BY r.updated_at DESC
       LIMIT 200`,
-  ).all<{ id: string; user_id: string; title: string; created_at: string; updated_at: string; email: string }>();
+  ).all<{
+    id: string;
+    user_id: string;
+    title: string;
+    document: string;
+    created_at: string;
+    updated_at: string;
+    email: string;
+    name: string;
+  }>();
 
   return json({
-    resumes: (results ?? []).map((row) => ({
-      id: row.id,
-      userId: row.user_id,
-      ownerEmail: row.email,
-      title: row.title,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    })),
+    resumes: (results ?? []).map((row) => {
+      // Same as the owner-scoped list: the badge comes out of the document blob,
+      // and a row whose blob will not parse still lists (as a draft).
+      let status: "draft" | "final" = "draft";
+      try {
+        if ((JSON.parse(row.document) as { status?: string }).status === "final") {
+          status = "final";
+        }
+      } catch {
+        // Keep the row; a draft badge is the safe default.
+      }
+
+      return {
+        id: row.id,
+        userId: row.user_id,
+        ownerEmail: row.email,
+        ownerName: row.name,
+        title: row.title,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        status,
+      };
+    }),
   });
 }
 

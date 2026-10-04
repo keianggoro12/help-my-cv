@@ -82,9 +82,17 @@ export async function handleLogin(env: Env, request: Request): Promise<Response>
  * A real PBKDF2 digest of a fixed random string, used only when the account
  * does not exist so a wrong email and a wrong password cost the same time.
  * The value is meaningless as a password — it is only there to be hashed.
+ *
+ * The iteration count MUST match `ITERATIONS` in `lib/password.ts`. This string
+ * is what every unknown-account login derives against, so a stale count is not
+ * cosmetic: workerd caps PBKDF2 at 100000 iterations and throws
+ * `NotSupportedError: iteration counts above 100000 are not supported` on
+ * anything higher, which turned every registration into a 500 `internal_error`
+ * (register hashes this dummy for its timing-equalising check) while every real
+ * account kept working. Keep the two in step.
  */
 const DUMMY_HASH =
-  "pbkdf2_sha256$210000$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000";
+  "pbkdf2_sha256$100000$00000000000000000000000000000000$0000000000000000000000000000000000000000000000000000000000000000";
 
 export async function handleLogout(env: Env, request: Request): Promise<Response> {
   const token = bearerToken(request.headers.get("Authorization"));

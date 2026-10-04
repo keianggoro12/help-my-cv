@@ -23,12 +23,27 @@ interface ResumeRow {
 }
 
 function toSummary(row: ResumeRow) {
+  // `status` lives inside the document, not in a column: the list view renders a
+  // draft/final badge and the overview counts by it, so it has to be read back
+  // out of the blob rather than defaulting to "draft" for every row.
+  let status: "draft" | "final" = "draft";
+  try {
+    const document = JSON.parse(row.document) as Resume;
+    if (document.status === "final") {
+      status = "final";
+    }
+  } catch {
+    // A row written by a client that never persisted a parseable document still
+    // lists fine; it just shows as a draft.
+  }
+
   return {
     id: row.id,
     userId: row.user_id,
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    status,
   };
 }
 
@@ -90,6 +105,7 @@ export async function createResume(
         title,
         createdAt: now,
         updatedAt: now,
+        status: document.status,
         document,
       },
     },
@@ -129,7 +145,16 @@ export async function updateResume(
     .bind(title, JSON.stringify({ ...document, updatedAt: now }), now, resumeId, userId)
     .run();
 
-  return json({ resume: { id: resumeId, userId, title, createdAt: current.created_at, updatedAt: now } });
+  return json({
+    resume: {
+      id: resumeId,
+      userId,
+      title,
+      createdAt: current.created_at,
+      updatedAt: now,
+      status: document.status,
+    },
+  });
 }
 
 export async function deleteResume(

@@ -7,11 +7,11 @@ import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { UserProfile } from "@helpmycv/shared";
+import type { ApiUser } from "@helpmycv/shared";
 
 export function AdminUsersPage() {
   const { t, locale } = useSession();
-  const [users, setUsers] = React.useState<UserProfile[]>([]);
+  const [users, setUsers] = React.useState<ApiUser[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -20,17 +20,10 @@ export function AdminUsersPage() {
       try {
         const res = await api.adminUsers();
         if (cancelled) return;
-        setUsers(
-          (res.users ?? []).map((u) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-            phone: "",
-            imageUrl: u.imageUrl ?? null,
-            createdAt: new Date().toISOString(),
-          })),
-        );
+        // Stored verbatim: widening this into `UserProfile` meant inventing a
+        // `phone` and a `createdAt` of `new Date()`, which put "Joined today"
+        // on every row. The list renders exactly what the API returns.
+        setUsers(res.users ?? []);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -60,16 +53,22 @@ export function AdminUsersPage() {
             {users.map((user) => (
               <tr key={user.id} className="border-b last:border-0">
                 <td className="px-5 py-3 font-medium text-foreground">
-                  <Link href={`/user/${user.id}/edit`} className="hover:underline">
+                  {/* `/admin/users` is the user's own record; the CV editor is
+                      keyed by resume id, so a user id here is a 404. */}
+                  <Link href={`/admin/users?user=${user.id}`} className="hover:underline">
                     {user.name}
                   </Link>
                 </td>
                 <td className="px-5 py-3 text-muted-foreground">{user.email}</td>
-                <td className="px-5 py-3 text-muted-foreground">{user.phone}</td>
+                <td className="px-5 py-3 text-muted-foreground">—</td>
                 <td className="px-5 py-3">
                   <div className="flex items-center gap-2">
                     <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
-                    <span className="text-xs text-muted-foreground">{formatDate(user.createdAt, locale)}</span>
+                    {user.createdAt ? (
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(user.createdAt, locale)}
+                      </span>
+                    ) : null}
                   </div>
                 </td>
               </tr>

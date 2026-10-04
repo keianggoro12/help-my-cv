@@ -2,44 +2,36 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { MoreHorizontal } from "lucide-react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
-import type { Resume } from "@helpmycv/shared";
+import type { ApiResumeSummary } from "@helpmycv/shared";
+
+/** One row: the shared summary plus who owns it, exactly as the API sends it. */
+type AdminResumeRow = ApiResumeSummary & { ownerEmail: string; ownerName: string };
 
 export function AdminResumesPage() {
   const { t, locale } = useSession();
-  const [resumes, setResumes] = React.useState<Array<Resume & { ownerEmail: string }>>([]);
+  const [resumes, setResumes] = React.useState<AdminResumeRow[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.adminResumes();
+        const result = await api.adminResumes();
         if (cancelled) return;
-        setResumes(
-          (res.resumes ?? []).map((r) => ({
-            id: r.id,
-            title: r.title,
-            userId: r.userId,
-            updatedAt: r.updatedAt,
-            createdAt: (r as any).createdAt ?? r.updatedAt,
-            sections: [] as any,
-            personal: {
-              fullName: r.ownerEmail || "",
-              role: "",
-              email: r.ownerEmail || "",
-              phone: "",
-              location: "",
-              linkedin: "",
-              website: "",
-              summary: "",
-            } as any,
-            ownerEmail: r.ownerEmail,
-          } as any)),
-        );
+        setResumes(result.resumes ?? []);
+      } catch (cause) {
+        // A rejected fetch here means the session died or the network is gone.
+        // Say so rather than rendering "no CVs", which reads as "nobody has
+        // made one" and hides a real fault.
+        console.error("admin resume list failed", cause);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -49,6 +41,10 @@ export function AdminResumesPage() {
     };
   }, []);
 
+  const openEditor = (resumeId: string) => {
+    window.open(`/user/${resumeId}/edit`, "_blank", "noopener");
+  };
+
   return (
     <div className="space-y-6 p-1 py-4">
       <header>
@@ -57,7 +53,7 @@ export function AdminResumesPage() {
 
       {resumes.length === 0 && !loading ? (
         <div className="rounded-3xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">
-          {t("admin.emptyResumes")}
+          {error ? t("admin.loadFailed") : t("admin.emptyResumes")}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-3xl border bg-card shadow-sm">
@@ -74,41 +70,31 @@ export function AdminResumesPage() {
               {resumes.map((resume) => (
                 <tr key={resume.id} className="border-b last:border-0">
                   <td className="px-5 py-3 font-medium text-foreground">
-                    <Link href={`/user/${resume.userId}/edit`} className="hover:underline">
+                    {/* The editor route is keyed by resume id, not user id. */}
+                    <Link href={`/user/${resume.id}/edit`} className="hover:underline">
                       {resume.title}
                     </Link>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">
-                    <Link href={`/user/${resume.userId}/edit`} className="hover:underline">
-                      {resume.ownerEmail ?? resume.personal?.fullName ?? "—"}
-                    </Link>
+                    {resume.ownerName || resume.ownerEmail || "—"}
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{formatDate(resume.updatedAt, locale)}</td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={resume.status === "final" ? "default" : "secondary"}>
+                        {resume.status === "final" ? t("resume.status.final") : t("resume.status.draft")}
+                      </Badge>
+                      <span className="text-xs">{formatDate(resume.updatedAt, locale)}</span>
+                    </div>
+                  </td>
                   <td className="px-5 py-3 text-right">
                     <button
                       type="button"
-                      aria-label="Actions"
-                      onClick={() => {
-                        window.open(`/user/${resume.userId}/edit`, "_blank");
-                      }}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                      aria-label={t("admin.openResume")}
+                      title={t("admin.openResume")}
+                      onClick={() => openEditor(resume.id)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-more-horizontal"
-                      >
-                        <circle cx="12" cy="12" r="1" />
-                        <circle cx="19" cy="12" r="1" />
-                        <circle cx="5" cy="12" r="1" />
-                      </svg>
+                      <MoreHorizontal className="h-4 w-4" />
                     </button>
                   </td>
                 </tr>

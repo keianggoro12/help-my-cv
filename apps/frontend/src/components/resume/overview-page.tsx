@@ -7,7 +7,7 @@ import * as React from "react";
 import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { listResumes } from "@/lib/resume-store";
+import { loadResumesForUser, listResumes } from "@/lib/resume-store";
 import { formatDate } from "@/lib/format";
 
 export function OverviewPage() {
@@ -18,10 +18,20 @@ export function OverviewPage() {
   );
 
   // Re-read once the session is known; the initial state is empty because the
-  // user id is unavailable during the first render.
+  // user id is unavailable during the first render. With the API live this is a
+  // request, so the cached list renders first and the server's answer replaces
+  // it — no spinner, no flash of "no CVs yet" on every visit.
   React.useEffect(() => {
     if (!loading && user) {
-      setResumes(listResumes(user.id));
+      let cancelled = false;
+      void loadResumesForUser(user.id).then((list) => {
+        if (!cancelled) {
+          setResumes(list);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
   }, [loading, user]);
 

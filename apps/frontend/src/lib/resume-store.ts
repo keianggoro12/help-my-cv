@@ -1,13 +1,20 @@
 "use client";
 
 /**
- * Mock resume storage.
+ * Resume storage.
  *
  * One localStorage key holds every user's resumes keyed by user id, matching
  * the shape a real "GET /resumes" would return. The demo user starts with two
  * sample CVs (`ensureSeeded`) so the card grid, the blurred preview and the
  * overview stats are populated on first run instead of an empty state that
  * hides layout bugs.
+ *
+ * When `API_ENABLED`, every read and write goes to the Hono backend instead and
+ * localStorage becomes a read-through cache of the last server response. That
+ * split matters: leaving resumes in localStorage meant nothing an author saved
+ * ever reached D1, so `/admin/resumes` legitimately had nothing to list.
+ * The cache keeps the app usable if the network fails, but the server is the
+ * only writer of record — never the cache.
  */
 
 import type { ExperienceEntry, Resume, ResumeTemplateId } from "@helpmycv/shared";
@@ -19,6 +26,7 @@ import {
   migrateResume,
 } from "@helpmycv/shared";
 
+import { api, API_ENABLED } from "@/lib/api-client";
 import { readJson, STORAGE_KEYS, writeJson } from "@/lib/storage";
 
 type ResumeMap = Record<string, Resume[]>;
@@ -316,9 +324,17 @@ function seedDemoResumes(): Resume[] {
  * Writes the demo CVs on first run. Keyed on the storage key rather than a
  * separate "seeded" flag, so clearing the CV list also re-seeds it — a reset
  * that leaves you with a permanently empty dashboard is worse than no reset.
+ *
+ * Skipped entirely once the API is live: these are fake rows for a fake user id
+ * that does not exist in D1, and seeding them into the cache would show a
+ * signed-in user CVs belonging to someone else until the first real fetch
+ * replaced them.
  */
 export function ensureSeeded(): void {
   if (typeof window === "undefined") {
+    return;
+  }
+  if (API_ENABLED) {
     return;
   }
   if (window.localStorage.getItem(STORAGE_KEYS.resumes) !== null) {
@@ -327,13 +343,94 @@ export function ensureSeeded(): void {
   saveResumes({ [DEMO_USER_ID]: seedDemoResumes() });
 }
 
+/** Overwrites the cache entry for one user, keeping other users' rows intact. */
+function cacheResumes(userId: string, resumes: Resume[]): void {
+  saveResumes({ ...loadResumes(), [userId]: resumes });
+}
+
+/**
+ * Every cached resume for a user, migrated and newest-first.
+ *
+ * Used as the synchronous initial value and as the offline fallback when a
+ * fetch fails, so a dropped connection still renders the last known list
+ * instead of blanking the page.
+ */
 export function listResumes(userId: string): Resume[] {
   return (loadResumes()[userId] ?? []).map(migrateResume).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
-export function getResume(userId: string, resumeId: string): Resume | null {
-  const found = (loadResumes()[userId] ?? []).find((resume) => resume.id === resumeId);
-  return found ? migrateResume(found) : null;
+/**
+ * The server's copy of the list for this user.
+ *
+ * A plain `ApiResumeSummary` has no sections, so each row is paired with the
+ * local cache to rebuild a full document — the grid and overview only need the
+ * title, status and timestamps, but `ResumeCard` is typed against `Resume` and
+ * reading `resume.status` off a half-populated object would show a wrong badge.
+ */
+async function fetchResumeList(userId: string): Promise<Resume[]> {
+  const { resumes } = await api.listResumes();
+  const cached = loadResumes()[userId] ?? [];
+  const byId = new Map(cached.map((resume) => [resume.id, resume]));
+
+  return resumes.map((summary) => {
+    const local = byId.get(summary.id);
+    const base = local ?? createResume({ id: summary.id, userId: summary.userId, title: summary.title });
+    return migrateResume({
+      ...base,
+      id: summary.id,
+      userId: summary.userId,
+      title: summary.title,
+      status: summary.status,
+      createdAt: summary.createdAt ?? base.createdAt,
+      updatedAt: summary.updatedAt,
+    });
+  });
+}
+
+/**
+ * Loads this user's CVs from the backend, refreshing the cache as a side
+ * effect. Falls back to the cache on any failure so a network error degrades
+ * to stale data rather than an empty page.
+ */
+export async function loadResumesForUser(userId: string): Promise<Resume[]> {
+  if (!API_ENABLED) {
+    return listResumes(userId);
+  }
+  try {
+    const list = await fetchResumeList(userId);
+    cacheResumes(userId, list);
+    return list;
+  } catch {
+    return listResumes(userId);
+  }
+}
+
+/**
+ * One resume, fetched in full from the backend.
+ *
+ * The editor needs every section, which the list endpoint does not return, so
+ * this is a separate request rather than a cache hit. Returns `null` on a 404
+ * so the editor can render its "not found" state, and on any other failure
+ * falls back to the cached copy — a draft in progress is not worth losing to a
+ * flaky connection.
+ */
+export async function getResume(userId: string, resumeId: string): Promise<Resume | null> {
+  if (!API_ENABLED) {
+    const found = listResumes(userId).find((resume) => resume.id === resumeId);
+    return found ?? null;
+  }
+
+  try {
+    const { resume } = await api.getResume(resumeId);
+    const document = migrateResume(resume.document);
+    cacheResumes(userId, [
+      document,
+      ...listResumes(userId).filter((candidate) => candidate.id !== resumeId),
+    ]);
+    return document;
+  } catch {
+    return listResumes(userId).find((resume) => resume.id === resumeId) ?? null;
+  }
 }
 
 /**
@@ -350,31 +447,66 @@ export function getResume(userId: string, resumeId: string): Resume | null {
  */
 export { migrateResume };
 
-export function createBlankResume(
+export async function createBlankResume(
   userId: string,
   title: string,
   templateId: ResumeTemplateId,
   email?: string,
-): Resume {
+): Promise<Resume> {
+  if (API_ENABLED) {
+    // The server mints the id, so the client cannot predict the row it is about
+    // to insert — the returned id is what the editor route has to open.
+    const { resume } = await api.createResume({ title });
+    const document = migrateResume(resume.document);
+    cacheResumes(userId, [document, ...listResumes(userId).filter((r) => r.id !== document.id)]);
+    return document;
+  }
+
   const resume = createResume({ id: createId("cv"), userId, title, templateId, email });
   const map = loadResumes();
   saveResumes({ ...map, [userId]: [resume, ...(map[userId] ?? [])] });
   return resume;
 }
 
-export function saveResume(resume: Resume): Resume {
+export async function saveResume(resume: Resume): Promise<Resume> {
+  const updated: Resume = { ...resume, updatedAt: new Date().toISOString() };
+
+  if (API_ENABLED) {
+    // Both halves are sent: the editor mutates `title` through rename but the
+    // document blob also carries it, and the backend keeps the two in sync from
+    // whichever arrives. A failure here must not silently drop the draft, so the
+    // cache is written first and the caller's error is re-thrown for the toast.
+    cacheResumes(resume.userId, [
+      updated,
+      ...listResumes(resume.userId).filter((candidate) => candidate.id !== updated.id),
+    ]);
+    const result = await api.updateResume(updated.id, {
+      title: updated.title,
+      document: updated,
+    });
+    return { ...updated, updatedAt: result.resume.updatedAt };
+  }
+
   const map = loadResumes();
   const list = map[resume.userId] ?? [];
   const index = list.findIndex((candidate) => candidate.id === resume.id);
 
-  const updated: Resume = { ...resume, updatedAt: new Date().toISOString() };
   const next = index === -1 ? [updated, ...list] : list.map((item) => (item.id === resume.id ? updated : item));
 
   saveResumes({ ...map, [resume.userId]: next });
   return updated;
 }
 
-export function renameResume(userId: string, resumeId: string, title: string): void {
+export async function renameResume(userId: string, resumeId: string, title: string): Promise<void> {
+  if (API_ENABLED) {
+    const { resume } = await api.updateResume(resumeId, { title });
+    cacheResumes(userId, [
+      { ...(listResumes(userId).find((r) => r.id === resumeId) ?? createResume({ id: resumeId, userId, title })), title, updatedAt: resume.updatedAt },
+      ...listResumes(userId).filter((r) => r.id !== resumeId),
+    ]);
+    return;
+  }
+
   const map = loadResumes();
   saveResumes({
     ...map,
@@ -384,7 +516,16 @@ export function renameResume(userId: string, resumeId: string, title: string): v
   });
 }
 
-export function deleteResume(userId: string, resumeId: string): void {
+export async function deleteResume(userId: string, resumeId: string): Promise<void> {
+  if (API_ENABLED) {
+    await api.deleteResume(resumeId);
+    cacheResumes(
+      userId,
+      listResumes(userId).filter((resume) => resume.id !== resumeId),
+    );
+    return;
+  }
+
   const map = loadResumes();
   saveResumes({
     ...map,

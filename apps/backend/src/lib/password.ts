@@ -5,9 +5,14 @@
  * high iteration count is the choice. It is deliberately slow: the point is to
  * make an offline attack on a stolen D1 dump expensive. Never compare a plain
  * password here.
+ *
+ * 100000 is a hard ceiling, not a preference. workerd refuses to derive above
+ * it — `NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+ * supported` — so raising this turns every registration into a 500, because the
+ * new-account path is the only one that hashes on the way in. Do not "improve"
+ * the count without checking that limit.
  */
-
-const ITERATIONS = 210_000;
+const ITERATIONS = 100_000;
 const KEY_BYTES = 32;
 
 const encoder = new TextEncoder();
