@@ -12,9 +12,13 @@ import {
   listUsers,
   overview,
   promoteUser,
+  updateUser,
 } from "./admin";
 import { storageRoutes } from "./storage";
 import {
+  adminDeleteResume,
+  adminGetResume,
+  adminUpdateResume,
   createResume,
   deleteResume,
   getResume,
@@ -83,8 +87,16 @@ export { storageRoutes };
 
 
 /**
- * Admin: read-only overview plus two destructive actions, both gated by
- * `requireAdmin` so a normal session gets 403 rather than a filtered response.
+ * Admin: overview plus the actions an admin is expected to take on other
+ * people's CVs and accounts, all gated by `requireAdmin` so a normal session
+ * gets 403 rather than a filtered response.
+ *
+ * The resume routes live under `/api/admin` rather than extending
+ * `/api/resumes/:id`. That is not cosmetic: the owner-scoped endpoints answer
+ * 404 for anyone but the owner, which is the correct answer for a user and the
+ * wrong one for an admin sitting on this screen. Keeping them apart means the
+ * owner check stays in one place and the admin capability is explicit in the
+ * route table instead of hiding behind a role check inside a query.
  */
 export const adminRoutes = new Hono<AppEnv>();
 
@@ -96,3 +108,24 @@ adminRoutes.get("/resumes", (c) => listAllResumes(c.env));
 
 adminRoutes.post("/users/:id/promote", (c) => promoteUser(c.env, c.req.param("id")));
 adminRoutes.delete("/users/:id", (c) => deleteUser(c.env, c.req.param("id")));
+adminRoutes.patch("/users/:id", async (c) => {
+  let body: { name?: string; role?: string; imageUrl?: string | null };
+  try {
+    body = (await c.req.json()) as typeof body;
+  } catch {
+    return json({ error: "invalid_body" }, 400);
+  }
+  return updateUser(c.env, c.get("user").id, c.req.param("id"), body);
+});
+
+adminRoutes.get("/resumes/:id", (c) => adminGetResume(c.env, c.req.param("id")));
+adminRoutes.delete("/resumes/:id", (c) => adminDeleteResume(c.env, c.req.param("id")));
+adminRoutes.patch("/resumes/:id", async (c) => {
+  let body: { title?: string; document?: Resume };
+  try {
+    body = (await c.req.json()) as typeof body;
+  } catch {
+    return json({ error: "invalid_body" }, 400);
+  }
+  return adminUpdateResume(c.env, c.req.param("id"), body);
+});

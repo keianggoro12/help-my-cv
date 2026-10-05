@@ -453,6 +453,50 @@ export function getResume(userId: string, resumeId: string): Promise<Resume | nu
 }
 
 /**
+ * The same two operations for a CV the caller does not own.
+ *
+ * The owner-scoped `getResume` above is right for a user's own CV and returns
+ * `null` for anyone else's, which is the correct answer there but wrong for the
+ * admin editor. These go through `/api/admin/resumes/:id`, and — importantly —
+ * they neither read nor write the per-user localStorage cache: that map is
+ * keyed by user id, and an admin editing someone's CV has no row of their own
+ * to file it under. Writing it under the admin's id would quietly graft another
+ * person's CV onto the admin's own CV list.
+ */
+export async function getResumeAsAdmin(resumeId: string): Promise<Resume | null> {
+  if (!API_ENABLED) {
+    // Offline there is one shared document anyway, so the cache is all there is.
+    for (const list of Object.values(loadResumes())) {
+      const found = list.find((resume) => resume.id === resumeId);
+      if (found) {
+        return migrateResume(found);
+      }
+    }
+    return null;
+  }
+  try {
+    const { resume } = await api.adminGetResume(resumeId);
+    return migrateResume(resume.document);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveResumeAsAdmin(resume: Resume): Promise<Resume> {
+  if (!API_ENABLED) {
+    // No API: fall back to the shared store so an offline admin still sees the
+    // edit reflected in the local list.
+    return saveResume(resume);
+  }
+  const updated: Resume = { ...resume, updatedAt: new Date().toISOString() };
+  const result = await api.adminUpdateResume(updated.id, {
+    title: updated.title,
+    document: updated,
+  });
+  return { ...updated, updatedAt: result.resume.updatedAt };
+}
+
+/**
  * Brings a stored resume up to the current section shape.
  *
  * Resumes are persisted per user in one localStorage blob, so any CV written

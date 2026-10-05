@@ -40,7 +40,7 @@ import type {
   SectionKey,
 } from "@helpmycv/shared";
 import { translateSection } from "@helpmycv/shared";
-import { getResume, saveResume } from "@/lib/resume-store";
+import { getResume, getResumeAsAdmin, saveResume, saveResumeAsAdmin } from "@/lib/resume-store";
 import { cn } from "@/lib/utils";
 
 const PERSONAL: SectionKey = "personal";
@@ -49,9 +49,18 @@ const PREVIEW_QUERY = "(min-width: 1280px)";
 
 interface EditorPageProps {
   resumeId: string;
+  /**
+   * Which store pair to read and write through.
+   *
+   * `"owner"` (the default) is the user's own CV and is scoped to their user id
+   * everywhere. `"admin"` resolves the same document through the unscoped admin
+   * endpoints, which is what lets an admin open and save a CV belonging to
+   * somebody else — the owner-scoped endpoint answers 404 for it by design.
+   */
+  loader?: "owner" | "admin";
 }
 
-export function EditorPage({ resumeId }: EditorPageProps) {
+export function EditorPage({ resumeId, loader = "owner" }: EditorPageProps) {
   const router = useRouter();
   const { user, loading, locale, t } = useSession();
 
@@ -73,20 +82,22 @@ export function EditorPage({ resumeId }: EditorPageProps) {
     // The full document is a request of its own: the list endpoint returns
     // summaries only, so the editor cannot load a CV from the cached list.
     let cancelled = false;
-    void getResume(user.id, resumeId).then((found) => {
-      if (cancelled) {
-        return;
-      }
-      if (found) {
-        setResume(found);
-      } else {
-        setNotFound(true);
-      }
-    });
+    void (loader === "admin" ? getResumeAsAdmin(resumeId) : getResume(user.id, resumeId)).then(
+      (found) => {
+        if (cancelled) {
+          return;
+        }
+        if (found) {
+          setResume(found);
+        } else {
+          setNotFound(true);
+        }
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [loading, resumeId, user]);
+  }, [loading, loader, resumeId, user]);
 
   // Wide screens get the preview by default; narrow ones opt in, because two
   // columns of form plus a sheet at 1024px leaves the fields unusably thin.
@@ -170,7 +181,7 @@ export function EditorPage({ resumeId }: EditorPageProps) {
       // Not deferred any more: with the API live this is a network round trip,
       // so the spinner stays up for as long as it genuinely takes and a failure
       // can be reported instead of silently showing a success that did not land.
-      setResume(await saveResume(resume));
+      setResume(loader === "admin" ? await saveResumeAsAdmin(resume) : await saveResume(resume));
       setDirty(false);
       setSaved(true);
       toast({ type: "success", title: t("resume.saved") });
@@ -201,7 +212,10 @@ export function EditorPage({ resumeId }: EditorPageProps) {
       <div className="rounded-3xl border border-dashed bg-card p-12 text-center">
         <h1 className="text-lg font-semibold text-foreground">{t("editor.notFound")}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t("editor.notFoundBody")}</p>
-        <Button className="mt-6" onClick={() => router.push("/user/resume-builder")}>
+        <Button
+          className="mt-6"
+          onClick={() => router.push(loader === "admin" ? "/admin/resumes" : "/user/resume-builder")}
+        >
           {t("editor.back")}
         </Button>
       </div>
@@ -231,7 +245,13 @@ export function EditorPage({ resumeId }: EditorPageProps) {
     <div className="flex h-[calc(100vh-2rem)] flex-col py-2">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b pb-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/user/resume-builder")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            // Back to whichever list this editor was opened from: the admin
+            // table for someone else's CV, the user's own builder otherwise.
+            onClick={() => router.push(loader === "admin" ? "/admin/resumes" : "/user/resume-builder")}
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">

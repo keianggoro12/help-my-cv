@@ -30,7 +30,7 @@ var init_proxy_external_request = __esm({
   "overrides/proxy-external-request.ts"() {
     "use strict";
     SERVICE_BINDINGS = {
-      "jastip-backend.keianggoro12.workers.dev": "BACKEND"
+      "helpmycv-backend-production.keianggoro12.workers.dev": "BACKEND"
     };
     fetchProxy = {
       name: "fetch-proxy-service-binding",

@@ -171,3 +171,85 @@ export async function deleteResume(
   }
   return json({ ok: true });
 }
+
+/* ---------------------------------------------------------------------------
+ * Admin variants
+ *
+ * The four functions above all scope to `user_id`, which is what stops one
+ * account reading or destroying another's CV by guessing an id. An admin is
+ * explicitly meant to work on anyone's CV, but reusing the owner-scoped
+ * handlers for that would mean either an `isAdmin` branch inside every query or
+ * dropping the owner check — the first spreads the exception through the code
+ * that most needs to be uniform, the second weakens the rule for ordinary
+ * users.
+ *
+ * So these are separate functions with no owner predicate at all. They are only
+ * reachable from routes mounted behind `requireAdmin`, and they take the
+ * caller from the middleware rather than a body or query field, so nothing a
+ * client sends can talk them into acting on the wrong account.
+ * ------------------------------------------------------------------------- */
+
+export async function adminGetResume(env: Env, resumeId: string): Promise<Response> {
+  const row = await env.DB.prepare(
+    "SELECT id, user_id, title, document, created_at, updated_at FROM resumes WHERE id = ?",
+  )
+    .bind(resumeId)
+    .first<ResumeRow>();
+
+  if (!row) {
+    return json({ error: "not_found" }, 404);
+  }
+  return json({ resume: { ...toSummary(row), document: migrateResume(JSON.parse(row.document) as Resume) } });
+}
+
+export async function adminUpdateResume(
+  env: Env,
+  resumeId: string,
+  body: { title?: string; document?: Resume },
+): Promise<Response> {
+  const current = await env.DB.prepare(
+    "SELECT id, user_id, title, document, created_at, updated_at FROM resumes WHERE id = ?",
+  )
+    .bind(resumeId)
+    .first<ResumeRow>();
+
+  if (!current) {
+    return json({ error: "not_found" }, 404);
+  }
+
+  const title = body.title ?? current.title;
+  const existing = JSON.parse(current.document) as Resume;
+  // Same migration on both sides as the owner-scoped path: an admin editing an
+  // old CV must not silently drop a section the stored document already has.
+  const document = migrateResume(
+    body.document
+      ? { ...body.document, id: resumeId, userId: current.user_id, title }
+      : { ...existing, title },
+  );
+
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "UPDATE resumes SET title = ?, document = ?, updated_at = ? WHERE id = ?",
+  )
+    .bind(title, JSON.stringify({ ...document, updatedAt: now }), now, resumeId)
+    .run();
+
+  return json({
+    resume: {
+      id: resumeId,
+      userId: current.user_id,
+      title,
+      createdAt: current.created_at,
+      updatedAt: now,
+      status: document.status,
+    },
+  });
+}
+
+export async function adminDeleteResume(env: Env, resumeId: string): Promise<Response> {
+  const result = await env.DB.prepare("DELETE FROM resumes WHERE id = ?").bind(resumeId).run();
+  if (!result.meta.changes) {
+    return json({ error: "not_found" }, 404);
+  }
+  return json({ ok: true });
+}

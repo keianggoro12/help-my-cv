@@ -178,4 +178,42 @@ export const api = {
   }> {
     return request("/api/admin/resumes");
   },
+
+  /**
+   * One CV as an admin, whoever owns it.
+   *
+   * Separate from `getResume` because that one is owner-scoped server-side and
+   * answers 404 for anyone else — correct for a user, wrong for this screen.
+   */
+  adminGetResume(id: string): Promise<{ resume: ApiResume }> {
+    return request(`/api/admin/resumes/${id}`);
+  },
+
+  adminUpdateResume(
+    id: string,
+    payload: { title?: string; document?: unknown },
+  ): Promise<{ resume: ApiResumeSummary }> {
+    return request(`/api/admin/resumes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  adminDeleteResume(id: string): Promise<{ ok: true }> {
+    return request(`/api/admin/resumes/${id}`, { method: "DELETE" });
+  },
+
+  adminUpdateUser(
+    id: string,
+    payload: { name?: string; role?: string; imageUrl?: string | null },
+  ): Promise<{ user: ApiUser }> {
+    return request(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  adminDeleteUser(id: string): Promise<{ ok: true }> {
+    return request(`/api/admin/users/${id}`, { method: "DELETE" });
+  },
 };

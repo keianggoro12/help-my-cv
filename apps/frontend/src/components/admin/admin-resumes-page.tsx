@@ -2,10 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { MoreHorizontal } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
@@ -20,6 +23,8 @@ export function AdminResumesPage() {
   const [resumes, setResumes] = React.useState<AdminResumeRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<AdminResumeRow | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -46,9 +51,34 @@ export function AdminResumesPage() {
     };
   }, [t, toast]);
 
-  const openEditor = (resumeId: string) => {
-    window.open(`/user/${resumeId}/edit`, "_blank", "noopener");
-  };
+  /**
+   * The editor route is keyed by resume id, and the editor loads through the
+   * owner-scoped `GET /api/resumes/:id`. An admin signed in as themselves would
+   * get a 404 on someone else's CV there, so this points at the admin editor
+   * route instead, which reads through `/api/admin/resumes/:id`.
+   */
+  const editorHref = (resumeId: string) => `/admin/resumes/${resumeId}/edit`;
+
+  async function handleDelete() {
+    if (!deleteTarget) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.adminDeleteResume(deleteTarget.id);
+      // Dropped from the local list rather than refetched: this screen already
+      // holds the full row set, and a refetch would re-run the animation and
+      // lose the scroll position for a one-row change.
+      setResumes((current) => current.filter((resume) => resume.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      toast({ type: "success", title: t("admin.resumeDeleted") });
+    } catch (cause) {
+      console.error("admin delete resume failed", cause);
+      toast({ type: "error", title: t("admin.resumeDeleteFailed") });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-6 p-1 py-4">
@@ -75,42 +105,74 @@ export function AdminResumesPage() {
               </tr>
             </thead>
             <tbody>
-              {resumes.map((resume) => (
-                <tr key={resume.id} className="border-b last:border-0">
-                  <td className="px-5 py-3 font-medium text-foreground">
-                    {/* The editor route is keyed by resume id, not user id. */}
-                    <Link href={`/user/${resume.id}/edit`} className="hover:underline">
-                      {resume.title}
-                    </Link>
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {resume.ownerName || resume.ownerEmail || "—"}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={resume.status === "final" ? "default" : "secondary"}>
-                        {resume.status === "final" ? t("resume.status.final") : t("resume.status.draft")}
-                      </Badge>
-                      <span className="text-xs">{formatDate(resume.updatedAt, locale)}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      aria-label={t("admin.openResume")}
-                      title={t("admin.openResume")}
-                      onClick={() => openEditor(resume.id)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {resumes.map((resume) => {
+                const owner = resume.ownerName || resume.ownerEmail || resume.userId;
+                return (
+                  <tr key={resume.id} className="border-b last:border-0">
+                    <td className="px-5 py-3 font-medium text-foreground">
+                      {/* The editor route is keyed by resume id, not user id. */}
+                      <Link href={editorHref(resume.id)} className="hover:underline">
+                        {resume.title}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3 text-muted-foreground">{owner}</td>
+                    <td className="px-5 py-3 text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={resume.status === "final" ? "default" : "secondary"}>
+                          {resume.status === "final" ? t("resume.status.final") : t("resume.status.draft")}
+                        </Badge>
+                        <span className="text-xs">{formatDate(resume.updatedAt, locale)}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <RowActionsMenu
+                        label={t("admin.rowActions", { name: resume.title })}
+                        actions={[
+                          {
+                            id: "edit",
+                            label: t("admin.editResume"),
+                            icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
+                            onSelect: () => {
+                              window.location.href = editorHref(resume.id);
+                            },
+                          },
+                          {
+                            id: "delete",
+                            label: t("admin.deleteResume"),
+                            icon: <Trash2 className="h-4 w-4" />,
+                            destructive: true,
+                            onSelect: () => setDeleteTarget(resume),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={t("admin.deleteResumeTitle")}
+        description={
+          deleteTarget ? t("admin.deleteResumeBody", { title: deleteTarget.title }) : undefined
+        }
+        dismissible={!deleting}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              {t("resume.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {t("admin.deleteResumeCta")}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

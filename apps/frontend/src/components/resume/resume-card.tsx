@@ -10,8 +10,7 @@
  * phase 1 has no PDF/print renderer to screenshot from.
  */
 
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import * as React from "react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import type { Resume } from "@helpmycv/shared";
 import type { TranslationKey } from "@helpmycv/shared";
@@ -19,6 +18,7 @@ import type { TranslationKey } from "@helpmycv/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -57,33 +57,6 @@ interface ResumeCardProps {
 }
 
 export function ResumeCard({ resume, locale, t, onEdit, onRename, onDelete }: ResumeCardProps) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
-
-  // Dismiss on outside click or Escape, so the menu behaves like a menu and
-  // not a toggle you have to click twice to close.
-  React.useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    function onPointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
-
   return (
     <Card className="relative flex flex-col p-5">
       <div className="flex items-start justify-between gap-2">
@@ -93,60 +66,28 @@ export function ResumeCard({ resume, locale, t, onEdit, onRename, onDelete }: Re
             {t("resume.createdAt", { date: formatDate(resume.createdAt, locale) })}
           </p>
         </div>
-        <div className="relative" ref={menuRef}>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t("resume.openMenu")}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-
-          {menuOpen ? (
-            <div
-              role="menu"
-              className="absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-2xl border bg-card p-1 shadow-lg animate-[pop-in_140ms_cubic-bezier(0.32,0.72,0,1)]"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onEdit();
-                }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-              >
-                <Pencil className="h-4 w-4 text-muted-foreground" />
-                {t("resume.edit")}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onRename();
-                }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
-              >
-                {t("resume.rename")}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onDelete();
-                }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-                {t("resume.delete")}
-              </button>
-            </div>
-          ) : null}
-        </div>
+        {/* Same menu the admin tables use, so "the three dots" behave the same
+            everywhere: dismiss on outside click or Escape, not only on a second
+            click of the trigger. */}
+        <RowActionsMenu
+          label={t("resume.openMenu")}
+          actions={[
+            {
+              id: "edit",
+              label: t("resume.edit"),
+              icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
+              onSelect: onEdit,
+            },
+            { id: "rename", label: t("resume.rename"), onSelect: onRename },
+            {
+              id: "delete",
+              label: t("resume.delete"),
+              icon: <Trash2 className="h-4 w-4" />,
+              destructive: true,
+              onSelect: onDelete,
+            },
+          ]}
+        />
       </div>
 
       <div
