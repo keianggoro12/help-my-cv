@@ -41,10 +41,22 @@ const SortableItemContext = React.createContext<{
   listeners: Record<string, Function> | undefined;
   isDragging: boolean;
   disabled: boolean;
+  /**
+   * dnd-kit needs to know which node the drag was started from.
+   *
+   * `SortableItemHandle` spreads `listeners` onto its own element, so without
+   * wiring this ref to that same element dnd-kit falls back to capturing the
+   * pointer on the draggable wrapper. Every `pointerup`/`click` inside the item
+   * is then retargeted to the wrapper `<div>`, and buttons within the item —
+   * duplicate, delete — never receive their click. The item still reorders by
+   * its grip, so the breakage is invisible until you try to click a button.
+   */
+  setActivatorNodeRef: (node: HTMLElement | null) => void;
 }>({
   listeners: undefined,
   isDragging: false,
   disabled: false,
+  setActivatorNodeRef: () => undefined,
 });
 
 /** Reorders items when a drag ends on a different slot. */
@@ -121,7 +133,7 @@ export interface SortableItemProps {
 }
 
 function SortableItem({ value, asChild = false, disabled = false, className, children }: SortableItemProps) {
-  const { setNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({
+  const { setNodeRef, setActivatorNodeRef, transform, transition, attributes, listeners, isDragging } = useSortable({
     id: value,
     disabled,
   });
@@ -134,7 +146,7 @@ function SortableItem({ value, asChild = false, disabled = false, className, chi
   const Comp = asChild ? Slot : "div";
 
   return (
-    <SortableItemContext.Provider value={{ listeners, isDragging, disabled }}>
+    <SortableItemContext.Provider value={{ listeners, isDragging, disabled, setActivatorNodeRef }}>
       <Comp
         data-slot="sortable-item"
         data-value={value}
@@ -167,7 +179,7 @@ function SortableItemHandle({
   cursor = true,
   label,
 }: SortableItemHandleProps) {
-  const { listeners, isDragging, disabled } = React.useContext(SortableItemContext);
+  const { listeners, isDragging, disabled, setActivatorNodeRef } = React.useContext(SortableItemContext);
   const Comp = asChild ? Slot : "div";
 
   return (
@@ -179,6 +191,7 @@ function SortableItemHandle({
       tabIndex={disabled ? -1 : 0}
       aria-label={label}
       aria-disabled={disabled || undefined}
+      ref={setActivatorNodeRef}
       {...listeners}
       className={cn(
         cursor && (isDragging ? "cursor-grabbing" : "cursor-grab"),
