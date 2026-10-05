@@ -68,5 +68,9 @@ export default function AdminEditResumePage({
     );
   }
 
-  return <EditorPage resumeId={resumeId} loader="admin" />;
+  return (
+    <div className="mx-auto flex h-full w-full max-w-[2000px] flex-col px-2 sm:px-4 lg:px-6">
+      <EditorPage resumeId={resumeId} loader="admin" />
+    </div>
+  );
 }
