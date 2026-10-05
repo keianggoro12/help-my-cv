@@ -11,6 +11,7 @@ import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { LandingAura } from "@/components/landing/landing-aura";
 
 const HIGHLIGHTS = [
   {
@@ -50,8 +51,9 @@ export function LandingPage() {
   const navItems = React.useMemo(() => buildMarketingNav(t), [t]);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pb-28 sm:px-6 sm:pb-16">
+    <main className="min-h-screen bg-background relative">
+      <LandingAura />
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pb-28 sm:px-6 sm:pb-16 relative z-10">
         <header className="flex items-center justify-between py-5">
           <div className="flex items-center gap-2">
             <img src="/logo-icon.png" alt="HelpMyCV" className="h-6 w-6 object-contain shrink-0" />
@@ -95,7 +97,7 @@ export function LandingPage() {
 
         <section className="grid gap-4 pb-8 sm:grid-cols-3">
           {HIGHLIGHTS.map((item) => (
-            <div key={item.title} className="rounded-3xl border bg-card p-5 text-left">
+            <div key={item.title} className="rounded-3xl border bg-card p-5 text-left landing-glass">
               <h2 className="text-sm font-semibold text-foreground">{item.title}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{item.body}</p>
             </div>

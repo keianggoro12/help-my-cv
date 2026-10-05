@@ -58,6 +58,145 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Landing aura
+ *
+ * Two centred gradient squares that follow the cursor on the marketing page.
+ * `--aura-dx/dy` are written on <html> by `LandingAura`; they are offsets from
+ * the centre of the viewport, because the layers are centred and translate by
+ * exactly that.
+ *
+ * The two decisions worth keeping:
+ *
+ *   - No `filter: blur()`. A blurred element is rasterised, then blurred, then
+ *     composited — so every pointermove re-runs the blur over a 60rem square.
+ *     The softness is in the gradient stops instead, which rasterise once and
+ *     are then only ever moved by the compositor.
+ *
+ *   - No `mix-blend-mode`, and no `backdrop-filter` on the layers. Both were the
+ *     obvious way to get the effect and both are traps here: the aura is a
+ *     fixed stacking context, so a blended child would composite against the
+ *     aura's own transparent backdrop instead of the page. Lightening and
+ *     darkening are instead expressed as the gradient's own colour and alpha,
+ *     which lands on the same result over the page's background without the
+ *     isolation problem.
+ * ------------------------------------------------------------------------- */
+:root {
+  /* Fallbacks for the first paint, which happens before the effect runs. */
+  --aura-dx: 0px;
+  --aura-dy: 0px;
+
+  /* #30394b as the light-mode glow: a cool near-black that reads as smoke on
+     a white page, so the halo takes light away from the background. */
+  --aura-rgb: 48 57 75;
+  --aura-peak: 0.2;
+  --aura-gloss-rgb: 96 118 152;
+  --aura-gloss-peak: 0.3;
+}
+
+/* The same glow inverted. #30394b's luminance flipped is a pale slate, which on
+   a near-black page adds light instead of removing it — the effect is the same
+   mechanism pointed the other way, not a different colour scheme. */
+.dark {
+  --aura-rgb: 199 208 224;
+  --aura-peak: 0.16;
+  --aura-gloss-rgb: 236 240 248;
+  --aura-gloss-peak: 0.1;
+}
+
+.landing-aura {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-aura__layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 64rem;
+  height: 64rem;
+  margin: -32rem 0 0 -32rem;
+  will-change: translate;
+}
+
+/* Six stops rather than two: a radial gradient from `closest-side` falls off
+   linearly, which reads as a disc with a visible rim. Approximating a gaussian
+   with intermediate stops is what makes it read as light. */
+.landing-aura__tint {
+  translate: var(--aura-dx) var(--aura-dy);
+  background: radial-gradient(
+    circle at center,
+    rgb(var(--aura-rgb) / var(--aura-peak)) 0%,
+    rgb(var(--aura-rgb) / calc(var(--aura-peak) * 0.66)) 24%,
+    rgb(var(--aura-rgb) / calc(var(--aura-peak) * 0.34)) 44%,
+    rgb(var(--aura-rgb) / calc(var(--aura-peak) * 0.13)) 62%,
+    rgb(var(--aura-rgb) / calc(var(--aura-peak) * 0.03)) 78%,
+    rgb(var(--aura-rgb) / 0) 92%
+  );
+}
+
+/* The bright core, held closer to the cursor than the tint (0.6x its offset)
+   so the two layers separate as the pointer moves and the halo has depth. */
+.landing-aura__gloss {
+  width: 34rem;
+  height: 34rem;
+  margin: -17rem 0 0 -17rem;
+  translate: calc(var(--aura-dx) * 0.6) calc(var(--aura-dy) * 0.6);
+  background: radial-gradient(
+    circle at center,
+    rgb(var(--aura-gloss-rgb) / var(--aura-gloss-peak)) 0%,
+    rgb(var(--aura-gloss-rgb) / calc(var(--aura-gloss-peak) * 0.5)) 30%,
+    rgb(var(--aura-gloss-rgb) / calc(var(--aura-gloss-peak) * 0.16)) 58%,
+    rgb(var(--aura-gloss-rgb) / 0) 82%
+  );
+}
+
+/* The easing is a CSS transition, not a rAF loop interpolating towards the
+   latest event: the pointer can stop mid-glide and the layer coasts to rest on
+   its own, and a pointer that never moves costs nothing at all. */
+@media (prefers-reduced-motion: no-preference) {
+  .landing-aura__layer {
+    transition: translate 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Frosted panels
+ *
+ * `backdrop-filter` is what makes these read as glass rather than as a
+ * translucent card — it samples the page *behind* the panel, which here is the
+ * moving aura, so the gradient shows through softened instead of hidden behind
+ * an opaque surface. `-webkit-` is kept alongside it for Safari.
+ * ------------------------------------------------------------------------- */
+:root {
+  --glass-bg: 255 255 255 / 0.55;
+  --glass-border: 15 23 42 / 0.08;
+  --glass-sheen: 255 255 255 / 0.9;
+  --glass-shadow: 15 23 42 / 0.18;
+}
+
+.dark {
+  --glass-bg: 30 41 59 / 0.42;
+  --glass-border: 255 255 255 / 0.1;
+  --glass-sheen: 255 255 255 / 0.14;
+  --glass-shadow: 0 0 0 / 0.6;
+}
+
+.landing-glass {
+  background-color: rgb(var(--glass-bg));
+  border: 1px solid rgb(var(--glass-border));
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  backdrop-filter: blur(20px) saturate(1.35);
+  box-shadow:
+    /* The top edge catches the light, which is the whole tell for glass: a
+       surface with a lit lip and a soft body. */
+    inset 0 1px 0 0 rgb(var(--glass-sheen)),
+    0 24px 48px -32px rgb(var(--glass-shadow));
+}
+
+/* ---------------------------------------------------------------------------
  * Press feedback
  *
  * Every control snaps between states with no acknowledgement that it was hit,
