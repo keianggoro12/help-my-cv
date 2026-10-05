@@ -55,39 +55,43 @@ export function PersonalSection({ personal, onChange, t }: PersonalSectionProps)
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        {personal.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={personal.photoUrl}
-            alt=""
-            className="h-16 w-16 rounded-2xl border object-cover"
-          />
-        ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed text-xs text-muted-foreground">
-            {t("field.photo")}
-          </div>
-        )}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <FieldLabel htmlFor="personal-photo">{t("field.photo")}</FieldLabel>
-            {/* Only offered while there is a photo to remove. Not every resume
-                carries one, and someone may simply not want their picture on
-                it, so removing has to be as reachable as adding. */}
-            {personal.photoUrl ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onRemovePhoto}
-                aria-label={t("field.removePhoto")}
-                className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {t("field.removePhoto")}
-              </Button>
-            ) : null}
-          </div>
+      <div className="flex items-start gap-4">
+        {/* The remove control is overlaid on the thumbnail rather than parked at
+            the far edge of the row: it acts on this picture, so it has to sit on
+            the picture. Spanning the row left the button ~100px from anything it
+            referred to, which read as an unrelated action. */}
+        <div className="relative shrink-0">
+          {personal.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={personal.photoUrl}
+              alt=""
+              className="h-16 w-16 rounded-2xl border object-cover"
+            />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed text-xs text-muted-foreground">
+              {t("field.photo")}
+            </div>
+          )}
+          {personal.photoUrl ? (
+            /* The badge is drawn small on the thumbnail's corner but its hit area
+               is padded out to 32px, so the control stays reachable on touch
+               without the badge covering the picture. */
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={onRemovePhoto}
+              aria-label={t("field.removePhoto")}
+              title={t("field.removePhoto")}
+              className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full border-2 border-background bg-background text-destructive shadow-sm hover:bg-background hover:text-destructive [&>svg]:h-3.5 [&>svg]:w-3.5"
+            >
+              <Trash2 />
+            </Button>
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <FieldLabel htmlFor="personal-photo">{t("field.photo")}</FieldLabel>
           <input
             ref={fileRef}
             id="personal-photo"
