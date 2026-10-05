@@ -69,10 +69,10 @@ export function ProfilePage() {
           // pointing at a picture the server never recorded.
           await updateProfile(user.id, { imageUrl: url });
           await refresh();
-          // Also update session user cache so Avatar shows immediately without reload
           try {
             const { user: me } = await api.me();
             (window as any).__session?.setUser?.(me);
+            (window as any).__session?.refresh?.();
           } catch {}
           toast({ type: "success", title: t("profile.photoUpdated") });
           return;
@@ -86,6 +86,11 @@ export function ProfilePage() {
         try {
           await updateProfile(user.id, { imageUrl: reader.result as string });
           await refresh();
+          try {
+            const { user: me } = await api.me();
+            (window as any).__session?.setUser?.(me);
+            (window as any).__session?.refresh?.();
+          } catch {}
           toast({ type: "success", title: t("profile.photoUpdated") });
         } catch (error) {
           toast({
