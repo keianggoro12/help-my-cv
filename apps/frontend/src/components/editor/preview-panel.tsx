@@ -33,14 +33,17 @@ import type {
   Locale,
   ProjectEntry,
   Resume,
+  ResumeTemplateId,
   SectionKey,
   SkillEntry,
   TranslationKey,
 } from "@helpmycv/shared";
 import { translateSection } from "@helpmycv/shared";
 
+import { ClassicSheet } from "@/components/editor/classic-sheet";
 import { Button } from "@/components/ui/button";
 import { formatDateRange, formatMonthYear } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 /** A4 at 96dpi, used to turn the preview column's width into a fit factor. */
 const A4_WIDTH_PX = 794;
@@ -141,12 +144,7 @@ export function PreviewPanel({ resume, locale, t }: PreviewPanelProps) {
             // never reflows when the preview size changes.
             style={{ width: "210mm", zoom: fitScale * (zoom / 100) }}
           >
-            <CvSheet
-              resume={resume}
-              locale={locale}
-              t={t}
-              className="cv-preview-page bg-white px-[18mm] py-[16mm] text-[10.5pt] leading-snug text-slate-900 shadow-md"
-            />
+            <SheetByTemplate resume={resume} locale={locale} t={t} variant="preview" />
           </div>
         ) : (
           <p className="mx-auto mt-10 max-w-[240px] text-center text-sm text-muted-foreground">
@@ -159,18 +157,48 @@ export function PreviewPanel({ resume, locale, t }: PreviewPanelProps) {
       {mounted && hasAnything
         ? createPortal(
             <div className="cv-print-root hidden">
-              <CvSheet
-                resume={resume}
-                locale={locale}
-                t={t}
-                className="cv-print-sheet bg-white px-[18mm] py-[16mm] text-[10.5pt] leading-snug text-slate-900"
-              />
+              <SheetByTemplate resume={resume} locale={locale} t={t} variant="print" />
             </div>,
             document.body,
           )
         : null}
     </div>
   );
+}
+
+/**
+ * Picks the layout for `resume.templateId`.
+ *
+ * The sheet is rendered twice (preview and print) from one `Resume`, so the
+ * template has to be resolved in one place or the two copies drift and a PDF
+ * comes out in a different template than the screen showed. Unknown and
+ * not-yet-built ids fall back to the default layout rather than rendering
+ * nothing — a CV with the wrong styling is recoverable, a blank page is not.
+ */
+function SheetByTemplate({
+  resume,
+  locale,
+  t,
+  variant,
+}: {
+  resume: Resume;
+  locale: Locale;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+  variant: "preview" | "print";
+}) {
+  const className = cn(
+    "bg-white px-[18mm] py-[16mm] text-slate-900",
+    variant === "preview" ? "cv-preview-page shadow-md" : "cv-print-sheet",
+    // The print sheet has no shadow and gets its size from globals.css; the
+    // preview needs one to read as a sheet of paper against the panel.
+    variant === "preview" && "text-[10.5pt] leading-snug",
+  );
+
+  if (resume.templateId === "classic") {
+    return <ClassicSheet resume={resume} locale={locale} t={t} className={className} />;
+  }
+
+  return <CvSheet resume={resume} locale={locale} t={t} className={className} />;
 }
 
 /** The document itself: header plus every visible section, in order. */

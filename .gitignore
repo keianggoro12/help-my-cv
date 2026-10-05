@@ -1,8 +1,16 @@
 node_modules/
 .next/
+.next-dev/
 out/
 dist/
 *.tsbuildinfo
 .DS_Store
 .env
 .env*.local
+
+# Wrangler's local state: the miniflare D1 database, the R2 filesystem and
+# the observability trace store. These are per-machine copies of data that
+# already exists in the real D1/R2, and they were being committed — which
+# means every local migration and every local upload showed up as a binary
+# diff in review.
+.wrangler/

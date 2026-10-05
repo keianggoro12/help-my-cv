@@ -172,8 +172,8 @@ export function emptyEntries(key: SectionKey): ResumeSection["entries"] {
 
 export const RESUME_TEMPLATES: ResumeTemplate[] = [
   { id: "blank", available: true },
+  { id: "classic", available: true },
   { id: "modern", available: false },
-  { id: "classic", available: false },
   { id: "minimal", available: false },
 ];
 

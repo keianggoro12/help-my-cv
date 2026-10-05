@@ -96,14 +96,7 @@ export function CreateResumeDialog({ open, onClose, onCreate, pending = false }:
                     </span>
                     {selected ? <Check className="h-4 w-4 text-primary" /> : null}
                   </div>
-                  <div className="h-20 rounded-lg border bg-card p-2" aria-hidden>
-                    <div className="h-2 w-8 rounded-full bg-muted" />
-                    <div className="mt-2 space-y-1">
-                      <div className="h-1.5 w-full rounded-full bg-muted" />
-                      <div className="h-1.5 w-4/5 rounded-full bg-muted" />
-                    </div>
-                    <div className="mt-2 h-1.5 w-6 rounded-full bg-muted" />
-                  </div>
+                  <TemplateThumb id={item.id} />
                   {disabled ? (
                     <span className="text-xs font-medium text-muted-foreground">
                       {t("resume.template.comingSoon")}
@@ -156,5 +149,50 @@ export function CreateResumeDialog({ open, onClose, onCreate, pending = false }:
         </>
       )}
     </Dialog>
+  );
+}
+
+/**
+ * A schematic of each layout, drawn from the same blocks the real sheet uses.
+ *
+ * Every card previously showed the identical grey placeholder, so the picker
+ * gave four names and no information — you picked a template before knowing
+ * what any of them looked like. Each thumbnail here mirrors one real
+ * structural decision of its layout (left-aligned name under a rule for
+ * `blank`, centred small-caps name under a double rule for `classic`) rather
+ * than depicting typography it cannot render at 80 pixels tall.
+ */
+function TemplateThumb({ id }: { id: ResumeTemplateId }) {
+  if (id === "classic") {
+    return (
+      <div className="flex h-20 flex-col items-center rounded-lg border bg-card px-2 py-2" aria-hidden>
+        <div className="h-2 w-10 rounded-sm bg-muted" />
+        <div className="mt-1 h-1 w-6 rounded-sm bg-muted/70" />
+        {/* The double rule is the layout's whole signature at this size. */}
+        <div className="mt-1.5 h-px w-full bg-foreground/40" />
+        <div className="mt-px h-px w-full bg-foreground/20" />
+        <div className="mt-2 flex w-full items-center gap-1">
+          <div className="h-1.5 w-7 rounded-sm bg-foreground/30" />
+          <div className="h-px flex-1 bg-muted" />
+          <div className="h-1.5 w-5 rounded-sm bg-muted" />
+        </div>
+        <div className="mt-1 flex w-full items-center gap-1">
+          <div className="h-1.5 w-7 rounded-sm bg-foreground/30" />
+          <div className="h-px flex-1 bg-muted" />
+          <div className="h-1.5 w-5 rounded-sm bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-20 flex-col rounded-lg border bg-card p-2" aria-hidden>
+      <div className="h-2 w-8 rounded-full bg-muted" />
+      <div className="mt-2 space-y-1">
+        <div className="h-1.5 w-full rounded-full bg-muted" />
+        <div className="h-1.5 w-4/5 rounded-full bg-muted" />
+      </div>
+      <div className="mt-2 h-1.5 w-6 rounded-full bg-muted" />
+    </div>
   );
 }

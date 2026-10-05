@@ -521,7 +521,15 @@ export async function createBlankResume(
     // The server mints the id, so the client cannot predict the row it is about
     // to insert — the returned id is what the editor route has to open.
     const { resume } = await api.createResume({ title });
-    const document = migrateResume(resume.document);
+    // `templateId` has to be applied here, not just on the offline path below.
+    // The server builds the row with `templateId: "blank"` and the create
+    // payload carries only a title, so the caller's choice never reached the
+    // document. It stayed invisible while `blank` was the only selectable
+    // template — a dropped value that happened to be the right one — and
+    // surfaced the moment a second template shipped and every new CV came out
+    // blank whichever card was picked. The identity seeding below only fills
+    // empty fields, so setting the template first cannot be undone by it.
+    const document: Resume = { ...migrateResume(resume.document), templateId };
     // Pre-fill the identity fields from the signed-in user, then persist. The
     // server's document is a blank slate, so without this the editor opened with
     // empty name/email/phone even though the user had already filled them in on
