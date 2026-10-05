@@ -38,17 +38,26 @@ const ICONS: Record<ToastType, React.ReactNode> = {
  * picked `dark:` pairs, which is why the four toasts looked like they came from
  * different apps and why a toast raised on a light page could keep a dark
  * background. Everything below resolves from `--primary`, `--destructive` and
- * the muted surfaces, so there is nothing left to keep in sync by hand.
+ * the card surfaces, so there is nothing left to keep in sync by hand.
+ *
+ * `ACCENT_BAR` is kept separate from `ACCENT_ICON` because they land on
+ * different elements: the icon inherits colour from its wrapper, the bar is a
+ * positioned sibling that has to be told its own background. Folding the bar's
+ * colour into the icon's class via a nested `[&_[data-slot=…]]` variant
+ * generated no rule at all, leaving the bar transparent.
  */
-const ACCENT: Record<ToastType, string> = {
-  success:
-    "text-emerald-600 dark:text-emerald-400 [&_[data-slot=toast-accent]]:bg-emerald-500",
-  error:
-    "text-destructive [&_[data-slot=toast-accent]]:bg-destructive",
-  info:
-    "text-primary [&_[data-slot=toast-accent]]:bg-primary",
-  loading:
-    "text-muted-foreground [&_[data-slot=toast-accent]]:bg-muted-foreground",
+const ACCENT_ICON: Record<ToastType, string> = {
+  success: "text-emerald-600 dark:text-emerald-400",
+  error: "text-destructive",
+  info: "text-primary",
+  loading: "text-muted-foreground",
+};
+
+const ACCENT_BAR: Record<ToastType, string> = {
+  success: "bg-emerald-500",
+  error: "bg-destructive",
+  info: "bg-primary",
+  loading: "bg-muted-foreground",
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -129,12 +138,9 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       <span
         data-slot="toast-accent"
         aria-hidden="true"
-        className={cn(
-          "absolute inset-y-0 left-0 w-1",
-          ACCENT[toast.type],
-        )}
+        className={cn("absolute inset-y-0 left-0 w-1", ACCENT_BAR[toast.type])}
       />
-      <div className={cn("mt-0.5 shrink-0", ACCENT[toast.type])}>{ICONS[toast.type]}</div>
+      <div className={cn("mt-0.5 shrink-0", ACCENT_ICON[toast.type])}>{ICONS[toast.type]}</div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium leading-snug">{toast.title}</p>
         {toast.message ? (
