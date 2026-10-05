@@ -53,7 +53,10 @@ export function LandingPage() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pb-28 sm:px-6 sm:pb-16">
         <header className="flex items-center justify-between py-5">
-          <span className="text-sm font-semibold tracking-tight text-foreground">{t("brand.name")}</span>
+          <div className="flex items-center gap-2">
+            <img src="/logo-icon.png" alt="HelpMyCV icon" className="h-6 w-6 object-contain shrink-0" />
+            <span className="text-sm font-semibold tracking-tight text-foreground">HelpMyCV</span>
+          </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button size="sm" onClick={() => openAuth("login")}>

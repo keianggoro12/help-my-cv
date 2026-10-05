@@ -87,7 +87,8 @@ export function PortalSidebar({
   return (
     <aside className="sticky top-4 hidden h-[calc(100vh-2rem)] w-72 shrink-0 flex-col rounded-3xl bg-card p-5 shadow-sm md:flex">
       <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+        <div className="inline-flex items-center gap-1.5 h-6 px-3 rounded-full bg-primary/10 text-primary text-[11px] font-semibold leading-none whitespace-nowrap overflow-hidden">
+          <img src="/logo-icon.png" alt="" className="h-3.5 w-3.5 object-contain shrink-0" />
           {eyebrow}
         </div>
         <h2 className="text-xl font-bold text-foreground">{title}</h2>
