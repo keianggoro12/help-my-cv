@@ -11,8 +11,11 @@
 
 import { useRef } from "react";
 
+import { Trash2 } from "lucide-react";
+
 import type { PersonalInfo, TranslationKey } from "@helpmycv/shared";
 
+import { Button } from "@/components/ui/button";
 import { FieldLabel } from "@/components/ui/field-label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +45,12 @@ export function PersonalSection({ personal, onChange, t }: PersonalSectionProps)
       }
     };
     reader.readAsDataURL(file);
+    // Clear the input so picking the same file twice still fires a change.
+    event.target.value = "";
+  }
+
+  function onRemovePhoto() {
+    patch({ photoUrl: null });
   }
 
   return (
@@ -60,7 +69,25 @@ export function PersonalSection({ personal, onChange, t }: PersonalSectionProps)
           </div>
         )}
         <div className="space-y-2">
-          <FieldLabel htmlFor="personal-photo">{t("field.photo")}</FieldLabel>
+          <div className="flex items-center justify-between gap-3">
+            <FieldLabel htmlFor="personal-photo">{t("field.photo")}</FieldLabel>
+            {/* Only offered while there is a photo to remove. Not every resume
+                carries one, and someone may simply not want their picture on
+                it, so removing has to be as reachable as adding. */}
+            {personal.photoUrl ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRemovePhoto}
+                aria-label={t("field.removePhoto")}
+                className="h-7 gap-1.5 px-2 text-xs text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t("field.removePhoto")}
+              </Button>
+            ) : null}
+          </div>
           <input
             ref={fileRef}
             id="personal-photo"
