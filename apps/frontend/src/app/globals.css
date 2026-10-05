@@ -83,6 +83,18 @@
     transform: scale(0.96);
     filter: brightness(0.94);
   }
+
+  /* A draggable row is not a control the reader presses, it is a container
+     that happens to carry `role="button"` for dnd-kit's keyboard support. The
+     press feedback above is meant for real controls, and applying it here
+     shrinks the whole row by 4% the instant it is touched. Every button
+     inside the row moves out from under the pointer before the click
+     completes, so delete and duplicate silently do nothing — the reader
+     presses, the row squashes, the click lands on the card behind. */
+  [data-slot="sortable-item"][role="button"]:active {
+    transform: none;
+    filter: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
