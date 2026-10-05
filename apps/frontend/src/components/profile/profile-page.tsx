@@ -11,7 +11,7 @@ import { FieldLabel } from "@/components/ui/field-label";
 import { Input } from "@/components/ui/input";
 import { updateProfile } from "@/lib/auth-store";
 import { formatDate } from "@/lib/format";
-import { readToken } from "@/lib/api-client";
+import { api, readToken } from "@/lib/api-client";
 import { Camera, Loader2 } from "lucide-react";
 
 function AvatarPreview({ name, imageUrl }: { name: string; imageUrl: string | null | undefined }) {
@@ -69,6 +69,11 @@ export function ProfilePage() {
           // pointing at a picture the server never recorded.
           await updateProfile(user.id, { imageUrl: url });
           await refresh();
+          // Also update session user cache so Avatar shows immediately without reload
+          try {
+            const { user: me } = await api.me();
+            (window as any).__session?.setUser?.(me);
+          } catch {}
           toast({ type: "success", title: t("profile.photoUpdated") });
           return;
         }
