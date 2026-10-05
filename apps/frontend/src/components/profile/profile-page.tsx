@@ -68,6 +68,10 @@ export function ProfilePage() {
           // failure here has to be reported instead of leaving the session
           // pointing at a picture the server never recorded.
           await updateProfile(user.id, { imageUrl: url });
+          // Immediately update local user state so UI re-renders without wait
+          try {
+            (window as any).__session?.setUser?.({ ...user, imageUrl: url });
+          } catch {}
           try {
             const { user: me } = await api.me();
             if (typeof window !== "undefined") {
@@ -91,6 +95,10 @@ export function ProfilePage() {
       reader.onload = async () => {
         try {
           await updateProfile(user.id, { imageUrl: reader.result as string });
+          // Immediately update local user state so UI re-renders without wait
+          try {
+            (window as any).__session?.setUser?.({ ...user, imageUrl: reader.result as string });
+          } catch {}
           try {
             const { user: me } = await api.me();
             if (typeof window !== "undefined") {
