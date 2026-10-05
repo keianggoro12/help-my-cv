@@ -68,12 +68,18 @@ export function ProfilePage() {
           // failure here has to be reported instead of leaving the session
           // pointing at a picture the server never recorded.
           await updateProfile(user.id, { imageUrl: url });
-          await refresh();
           try {
             const { user: me } = await api.me();
-            (window as any).__session?.setUser?.(me);
-            (window as any).__session?.refresh?.();
+            if (typeof window !== "undefined") {
+              (window as any).__session?.setUser?.(me);
+              (window as any).__session?.refresh?.();
+            }
           } catch {}
+          // Trigger refresh from session provider too
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("helpmycv:storage"));
+          }
+          await refresh();
           toast({ type: "success", title: t("profile.photoUpdated") });
           return;
         }
@@ -85,12 +91,15 @@ export function ProfilePage() {
       reader.onload = async () => {
         try {
           await updateProfile(user.id, { imageUrl: reader.result as string });
-          await refresh();
           try {
             const { user: me } = await api.me();
-            (window as any).__session?.setUser?.(me);
-            (window as any).__session?.refresh?.();
+            if (typeof window !== "undefined") {
+              (window as any).__session?.setUser?.(me);
+              (window as any).__session?.refresh?.();
+              window.dispatchEvent(new Event("helpmycv:storage"));
+            }
           } catch {}
+          await refresh();
           toast({ type: "success", title: t("profile.photoUpdated") });
         } catch (error) {
           toast({
