@@ -60,6 +60,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const refresh = React.useCallback(() => {
     setUser((current) => {
       const next = getSession();
+      // Always replace when imageUrl changed so avatar updates immediately
+      if (current && next && current.id === next.id && current.imageUrl !== next.imageUrl) {
+        return next;
+      }
       if (current && next && current.id === next.id && current.email === next.email) {
         return current;
       }
