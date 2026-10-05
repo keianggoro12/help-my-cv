@@ -13,7 +13,7 @@ const en = {
   "brand.name": "Help My CV",
   "brand.tagline": "We only help your CV, not your career.",
   "brand.subtitle":
-    "Build, edit, and keep every version of your resume in one place. In Indonesia, CV and resume mean the same thing — so we just call it your CV.",
+    "Build, edit, and keep every version of your CV in one place. In Indonesia, CV and resume mean the same thing, so we just call it your CV.",
 
   "nav.home": "Home",
   "nav.features": "Features",
@@ -255,7 +255,7 @@ const id: Record<TranslationKey, string> = {
   "brand.name": "Help My CV",
   "brand.tagline": "Kami hanya membantu CV mu, bukan karier mu.",
   "brand.subtitle":
-    "Buat, edit, dan simpan semua versi CV kamu di satu tempat. Di Indonesia, istilah CV dan resume sama saja — jadi kami sebut saja CV kamu.",
+    "Buat, edit, dan simpan semua versi CV kamu di satu tempat. Di Indonesia CV dan resume artinya sama, jadi kami sebut saja CV kamu.",
 
   "nav.home": "Beranda",
   "nav.features": "Fitur",
