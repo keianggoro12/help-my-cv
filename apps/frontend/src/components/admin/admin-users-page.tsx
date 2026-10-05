@@ -5,12 +5,14 @@ import Link from "next/link";
 
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { ApiUser } from "@helpmycv/shared";
 
 export function AdminUsersPage() {
   const { t, locale } = useSession();
+  const { toast } = useToast();
   const [users, setUsers] = React.useState<ApiUser[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -24,6 +26,11 @@ export function AdminUsersPage() {
         // `phone` and a `createdAt` of `new Date()`, which put "Joined today"
         // on every row. The list renders exactly what the API returns.
         setUsers(res.users ?? []);
+      } catch (cause) {
+        // Without this the table simply stayed empty, which reads as "no users
+        // exist" and hides a real fault.
+        console.error("admin user list failed", cause);
+        toast({ type: "error", title: t("admin.loadFailed") });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -31,7 +38,7 @@ export function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t, toast]);
 
   return (
     <div className="space-y-6 p-1 py-4">
@@ -39,7 +46,10 @@ export function AdminUsersPage() {
         <h1 className="text-2xl font-bold text-foreground">{t("admin.users")}</h1>
       </header>
 
-      <div className="overflow-x-auto rounded-3xl border bg-card shadow-sm">
+      <div
+        data-slot="content-enter"
+        className="overflow-x-auto rounded-3xl border bg-card shadow-sm"
+      >
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground">
             <tr>

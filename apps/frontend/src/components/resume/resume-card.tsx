@@ -149,7 +149,19 @@ export function ResumeCard({ resume, locale, t, onEdit, onRename, onDelete }: Re
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center py-5">
+      <div
+        className="flex flex-1 items-center justify-center py-5"
+        data-slot="clickable-row"
+        role="button"
+        tabIndex={0}
+        onClick={onEdit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onEdit();
+          }
+        }}
+      >
         {/* Blurred at rest, as the PRD asks: the card grid is a gallery, and a
             readable thumbnail would leak the whole CV to anyone glancing at
             the screen. Hover sharpens it for the person who owns it. */}

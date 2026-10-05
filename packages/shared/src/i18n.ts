@@ -45,6 +45,7 @@ const en = {
   "auth.registerSuccess": "Account created",
   "auth.welcomeBack": "Welcome back, {name}!",
   "auth.accountCreated": "Your account is ready.",
+  "auth.logoutSuccess": "Signed out",
 
   "sidebar.overview": "Overview",
   "sidebar.resumeBuilder": "Resume Builder",
@@ -257,6 +258,7 @@ const id: Record<TranslationKey, string> = {
   "auth.registerSuccess": "Akun dibuat",
   "auth.welcomeBack": "Selamat datang kembali, {name}!",
   "auth.accountCreated": "Akun Anda siap digunakan.",
+  "auth.logoutSuccess": "Berhasil keluar",
 
   "sidebar.overview": "Ringkasan",
   "sidebar.resumeBuilder": "Pembangun CV",

@@ -20,6 +20,7 @@ import { LogOut, type LucideIcon } from "lucide-react";
 import { useSession } from "@/components/providers/session-provider";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useToast } from "@/components/ui/toast";
 import { LanguageSwitch } from "@/components/portal/language-switch";
 import type { TranslationKey } from "@helpmycv/shared";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,7 @@ export function PortalSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, t } = useSession();
+  const { toast } = useToast();
 
   function isActive(item: SidebarItem) {
     if (pathname === item.href) {
@@ -74,6 +76,10 @@ export function PortalSidebar({
   }
 
   function handleSignOut() {
+    // Raised before the navigation: the toast lives in the provider this
+    // sidebar is about to unmount, and a landing page with no way back is not
+    // where the confirmation belongs anyway.
+    toast({ type: "success", title: t("auth.logoutSuccess") });
     signOut();
     router.push("/");
   }

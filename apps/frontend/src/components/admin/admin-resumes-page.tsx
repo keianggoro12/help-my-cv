@@ -6,6 +6,7 @@ import { MoreHorizontal } from "lucide-react";
 
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import type { ApiResumeSummary } from "@helpmycv/shared";
@@ -15,6 +16,7 @@ type AdminResumeRow = ApiResumeSummary & { ownerEmail: string; ownerName: string
 
 export function AdminResumesPage() {
   const { t, locale } = useSession();
+  const { toast } = useToast();
   const [resumes, setResumes] = React.useState<AdminResumeRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
@@ -31,7 +33,10 @@ export function AdminResumesPage() {
         // Say so rather than rendering "no CVs", which reads as "nobody has
         // made one" and hides a real fault.
         console.error("admin resume list failed", cause);
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          setError(true);
+          toast({ type: "error", title: t("admin.loadFailed") });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -39,7 +44,7 @@ export function AdminResumesPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t, toast]);
 
   const openEditor = (resumeId: string) => {
     window.open(`/user/${resumeId}/edit`, "_blank", "noopener");
@@ -56,7 +61,10 @@ export function AdminResumesPage() {
           {error ? t("admin.loadFailed") : t("admin.emptyResumes")}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border bg-card shadow-sm">
+        <div
+          data-slot="content-enter"
+          className="overflow-x-auto rounded-3xl border bg-card shadow-sm"
+        >
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground">
               <tr>

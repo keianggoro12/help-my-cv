@@ -3,14 +3,20 @@
 import * as React from "react";
 
 import { useSession } from "@/components/providers/session-provider";
+import { useToast } from "@/components/ui/toast";
 import { api, API_ENABLED } from "@/lib/api-client";
 import { readJson, STORAGE_KEYS } from "@/lib/storage";
 import type { UserProfile } from "@helpmycv/shared";
 
 export function AdminDashboardPage() {
   const { t } = useSession();
+  const { toast } = useToast();
   const [users, setUsers] = React.useState<UserProfile[]>([]);
   const [resumeCount, setResumeCount] = React.useState(0);
+  // Counted from the overview response rather than thrown away: the endpoint
+  // reports the user total, and the dashboard was rendering a hardcoded 0
+  // next to a resume count that did work.
+  const [userCount, setUserCount] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -19,25 +25,30 @@ export function AdminDashboardPage() {
         try {
           const res = await api.adminOverview();
           if (cancelled) return;
-          setUsers([]);
-          setResumeCount(res.stats.resumes);
+          setUserCount(res.stats.users ?? 0);
+          setResumeCount(res.stats.resumes ?? 0);
         } catch (e) {
           console.error("admin overview", e);
+          if (!cancelled) {
+            toast({ type: "error", title: t("admin.loadFailed") });
+          }
         }
         return;
       }
       const store = readJson<Record<string, UserProfile[]>>(STORAGE_KEYS.resumes, {});
       if (cancelled) return;
-      setUsers(Object.values(readJson<Record<string, UserProfile>>(STORAGE_KEYS.users, {})));
-      setResumeCount(Object.values(store).reduce((total, list) => total + list.length, 0));
+      const list = Object.values(readJson<Record<string, UserProfile>>(STORAGE_KEYS.users, {}));
+      setUsers(list);
+      setUserCount(list.length);
+      setResumeCount(Object.values(store).reduce((total, entries) => total + entries.length, 0));
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t, toast]);
 
   const stats = [
-    { label: t("admin.users"), value: API_ENABLED ? 0 : users.length },
+    { label: t("admin.users"), value: API_ENABLED ? userCount : users.length },
     { label: t("admin.resumes"), value: resumeCount },
   ];
 
@@ -48,7 +59,7 @@ export function AdminDashboardPage() {
         <p className="text-sm text-muted-foreground">{t("admin.subtitle")}</p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div data-slot="content-enter" className="grid gap-4 sm:grid-cols-2">
         {stats.map((stat) => (
           <div key={stat.label} className="rounded-3xl border bg-card p-5 shadow-sm">
             <p className="text-sm text-muted-foreground">{stat.label}</p>

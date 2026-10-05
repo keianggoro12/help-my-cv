@@ -95,6 +95,26 @@
     transform: none;
     filter: none;
   }
+
+  /* Rows, tabs and list items read as clickable but are not `button`
+     elements, so they never got any acknowledgement at all. A short press
+     dip is what tells the reader the click registered before the navigation
+     or the panel swap happens. */
+  [data-slot="clickable-row"]:active {
+    transform: scale(0.985);
+    filter: brightness(0.96);
+  }
+
+  /* Content that arrives after a click — a panel swap, a filtered list, the
+     admin tables replacing their skeleton. Fades and lifts in rather than
+     snapping, so the change is legible as a response to the click. */
+  @keyframes content-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  [data-slot="content-enter"] {
+    animation: content-in 240ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -125,6 +145,20 @@
   @keyframes scrim-in {
     from { opacity: 0; }
     to   { opacity: 1; }
+  }
+
+  /* Toasts. These were referenced by `toast.tsx` but never declared, so the
+     animation silently resolved to no keyframes and every toast appeared at
+     full opacity with no motion at all. `toast-out` is what the dismiss button
+     plays; it holds the element in place until the provider removes it, so a
+     hand-dismissed toast slides away instead of blinking out. */
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes toast-out {
+    from { opacity: 1; transform: translateY(0)    scale(1); }
+    to   { opacity: 0; transform: translateY(8px)  scale(0.98); }
   }
 }
 
