@@ -76,12 +76,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(readStoredLocale());
     refresh();
 
+    // Expose a global bridge so stores can trigger an immediate refresh after
+    // writing to session (prevents having to wait for the next storage event)
+    (window as any).__session = { refresh, setUser };
+
     // Same-tab writes and other-tab writes both land here.
     const onStorage = () => refresh();
     window.addEventListener("helpmycv:storage", onStorage);
     window.addEventListener("storage", onStorage);
 
     return () => {
+      delete (window as any).__session;
       window.removeEventListener("helpmycv:storage", onStorage);
       window.removeEventListener("storage", onStorage);
     };

@@ -268,5 +268,10 @@ export async function updateProfile(
     writeJson(STORAGE_KEYS.session, local);
   }
 
+  // Notify session provider subscribers to refresh without a full reload
+  if (typeof window !== "undefined") {
+    (window as any).__session?.refresh?.();
+  }
+
   return local;
 }
