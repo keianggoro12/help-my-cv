@@ -47,12 +47,22 @@ export function ResumeBuilderPage() {
     }
   }, [loading, refresh, user]);
 
+  // Redirect to homepage/login if not signed in (avoid showing a half-loaded builder)
   // The overview page deep-links here with ?create=1.
   React.useEffect(() => {
-    if (searchParams.get("create") === "1") {
+    if (!loading && user && searchParams.get("create") === "1") {
       setCreateOpen(true);
     }
-  }, [searchParams]);
+  }, [loading, user, searchParams]);
+
+  if (!loading && !user) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-sm text-muted-foreground">
+        <p>{t("editor.sessionExpired")}</p>
+        <Button onClick={() => router.push("/")}>{t("editor.back")}</Button>
+      </div>
+    );
+  }
 
   async function handleCreate(templateId: "blank" | "modern" | "classic" | "minimal", title: string) {
     if (!user) {
