@@ -240,6 +240,12 @@ const en = {
   "admin.userDeleted": "User deleted",
   "admin.userDeleteFailed": "Could not delete the user.",
   "admin.cannotDemoteSelf": "You cannot remove your own admin access.",
+  "admin.actions": "Actions",
+  "admin.usersSubtitle": "Accounts registered on Help My CV.",
+  "admin.usersCount": "{count} accounts registered.",
+  "admin.resumesSubtitle": "Every CV created across Help My CV.",
+  "admin.resumesCount": "{count} CVs saved.",
+  "admin.emptyUsers": "No users yet.",
 } as const;
 
 /** English keys, used to type the other locales. */
@@ -476,6 +482,12 @@ const id: Record<TranslationKey, string> = {
   "admin.userDeleted": "User dihapus",
   "admin.userDeleteFailed": "Gagal menghapus user.",
   "admin.cannotDemoteSelf": "Kamu tidak bisa menghapus akses admin milikmu sendiri.",
+  "admin.actions": "Aksi",
+  "admin.usersSubtitle": "Akun yang terdaftar di Help My CV.",
+  "admin.usersCount": "{count} akun terdaftar.",
+  "admin.resumesSubtitle": "Semua CV yang dibuat di Help My CV.",
+  "admin.resumesCount": "{count} CV tersimpan.",
+  "admin.emptyUsers": "Belum ada user.",
 };
 
 export const dictionaries = { en, id } satisfies Record<Locale, Record<TranslationKey, string>>;

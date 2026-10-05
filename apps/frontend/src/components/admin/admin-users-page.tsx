@@ -4,6 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 
+import {
+  DataTable,
+  DataTableActionsCell,
+  DataTableCell,
+  DataTableEmptyRow,
+  DataTableHead,
+} from "@/components/admin/data-table";
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,76 +128,89 @@ export function AdminUsersPage() {
     <div className="space-y-6 p-1 py-4">
       <header>
         <h1 className="text-2xl font-bold text-foreground">{t("admin.users")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {users.length > 0
+            ? t("admin.usersCount", { count: users.length })
+            : t("admin.usersSubtitle")}
+        </p>
       </header>
 
-      <div
-        data-slot="content-enter"
-        className="overflow-x-auto rounded-3xl border bg-card shadow-sm"
-      >
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-5 py-3 font-medium">{t("auth.name")}</th>
-              <th className="px-5 py-3 font-medium">{t("auth.email")}</th>
-              <th className="px-5 py-3 font-medium">{t("auth.phone")}</th>
-              <th className="px-5 py-3 font-medium">{t("admin.joined")}</th>
-              <th className="w-12 px-5 py-3" />
+      <DataTable minWidth="680px" data-slot="content-enter">
+        <thead>
+          <tr>
+            <DataTableHead>{t("auth.name")}</DataTableHead>
+            <DataTableHead>{t("auth.email")}</DataTableHead>
+            {/* The API does not return a phone number, so the column has always
+                rendered a dash. Dropping it below `sm` costs no information and
+                buys back the width the action button needs. */}
+            <DataTableHead className="hidden sm:table-cell">{t("auth.phone")}</DataTableHead>
+            <DataTableHead>{t("admin.joined")}</DataTableHead>
+            <DataTableHead className="w-16">
+              <span className="sr-only">{t("admin.actions")}</span>
+            </DataTableHead>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
+            <tr
+              key={user.id}
+              className="transition-colors hover:bg-muted/40"
+              data-slot="data-table-row"
+            >
+              <DataTableCell className="max-w-[220px] font-medium text-foreground">
+                {/* `/admin/users` is the user's own record; the CV editor is
+                    keyed by resume id, so a user id here is a 404. */}
+                <Link
+                  href={`/admin/users?user=${user.id}`}
+                  title={user.name}
+                  className="block truncate hover:underline"
+                >
+                  {user.name}
+                </Link>
+              </DataTableCell>
+              <DataTableCell className="max-w-[240px]">
+                <span className="block truncate" title={user.email}>
+                  {user.email}
+                </span>
+              </DataTableCell>
+              <DataTableCell className="hidden sm:table-cell">—</DataTableCell>
+              <DataTableCell className="whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                  <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
+                  {user.createdAt ? (
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(user.createdAt, locale)}
+                    </span>
+                  ) : null}
+                </div>
+              </DataTableCell>
+              <DataTableActionsCell>
+                <RowActionsMenu
+                  label={t("admin.rowActions", { name: user.name || user.email })}
+                  actions={[
+                    {
+                      id: "edit",
+                      label: t("admin.editUser"),
+                      icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
+                      onSelect: () => openEdit(user),
+                    },
+                    {
+                      id: "delete",
+                      label: t("admin.deleteUser"),
+                      icon: <Trash2 className="h-4 w-4" />,
+                      destructive: true,
+                      onSelect: () => setDeleteTarget(user),
+                    },
+                  ]}
+                />
+              </DataTableActionsCell>
             </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b last:border-0">
-                <td className="px-5 py-3 font-medium text-foreground">
-                  {/* `/admin/users` is the user's own record; the CV editor is
-                      keyed by resume id, so a user id here is a 404. */}
-                  <Link href={`/admin/users?user=${user.id}`} className="hover:underline">
-                    {user.name}
-                  </Link>
-                </td>
-                <td className="px-5 py-3 text-muted-foreground">{user.email}</td>
-                <td className="px-5 py-3 text-muted-foreground">—</td>
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>{user.role}</Badge>
-                    {user.createdAt ? (
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(user.createdAt, locale)}
-                      </span>
-                    ) : null}
-                  </div>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <RowActionsMenu
-                    label={t("admin.rowActions", { name: user.name || user.email })}
-                    actions={[
-                      {
-                        id: "edit",
-                        label: t("admin.editUser"),
-                        icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
-                        onSelect: () => openEdit(user),
-                      },
-                      {
-                        id: "delete",
-                        label: t("admin.deleteUser"),
-                        icon: <Trash2 className="h-4 w-4" />,
-                        destructive: true,
-                        onSelect: () => setDeleteTarget(user),
-                      },
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && !loading && (
-              <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-sm text-muted-foreground">
-                  {t("admin.emptyResumes")}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          ))}
+          {users.length === 0 && !loading ? (
+            <DataTableEmptyRow colSpan={5}>{t("admin.emptyUsers")}</DataTableEmptyRow>
+          ) : null}
+        </tbody>
+      </DataTable>
 
       <Dialog
         open={editTarget !== null}

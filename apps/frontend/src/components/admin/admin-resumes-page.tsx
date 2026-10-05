@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
+
+import {
+  DataTable,
+  DataTableActionsCell,
+  DataTableCell,
+  DataTableHead,
+} from "@/components/admin/data-table";
 
 import { useSession } from "@/components/providers/session-provider";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +33,7 @@ export function AdminResumesPage() {
   const [error, setError] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<AdminResumeRow | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const router = useRouter();
 
   React.useEffect(() => {
     let cancelled = false;
@@ -84,74 +93,88 @@ export function AdminResumesPage() {
     <div className="space-y-6 p-1 py-4">
       <header>
         <h1 className="text-2xl font-bold text-foreground">{t("admin.resumes")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {resumes.length > 0
+            ? t("admin.resumesCount", { count: resumes.length })
+            : t("admin.resumesSubtitle")}
+        </p>
       </header>
 
       {resumes.length === 0 && !loading ? (
-        <div className="rounded-3xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed bg-card p-12 text-center text-sm text-muted-foreground">
           {error ? t("admin.loadFailed") : t("admin.emptyResumes")}
         </div>
       ) : (
-        <div
-          data-slot="content-enter"
-          className="overflow-x-auto rounded-3xl border bg-card shadow-sm"
-        >
-          <table className="w-full min-w-[800px] text-left text-sm">
-            <thead className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-5 py-3 font-medium">{t("resume.nameLabel")}</th>
-                <th className="px-5 py-3 font-medium">{t("admin.createdBy")}</th>
-                <th className="px-5 py-3 font-medium">{t("admin.lastUpdate")}</th>
-                <th className="w-12 px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {resumes.map((resume) => {
-                const owner = resume.ownerName || resume.ownerEmail || resume.userId;
-                return (
-                  <tr key={resume.id} className="border-b last:border-0">
-                    <td className="px-5 py-3 font-medium text-foreground">
-                      {/* The editor route is keyed by resume id, not user id. */}
-                      <Link href={editorHref(resume.id)} className="hover:underline">
-                        {resume.title}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3 text-muted-foreground">{owner}</td>
-                    <td className="px-5 py-3 text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={resume.status === "final" ? "default" : "secondary"}>
-                          {resume.status === "final" ? t("resume.status.final") : t("resume.status.draft")}
-                        </Badge>
-                        <span className="text-xs">{formatDate(resume.updatedAt, locale)}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <RowActionsMenu
-                        label={t("admin.rowActions", { name: resume.title })}
-                        actions={[
-                          {
-                            id: "edit",
-                            label: t("admin.editResume"),
-                            icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
-                            onSelect: () => {
-                              window.location.href = editorHref(resume.id);
-                            },
+        <DataTable minWidth="720px" data-slot="content-enter">
+          <thead>
+            <tr>
+              <DataTableHead>{t("resume.nameLabel")}</DataTableHead>
+              <DataTableHead>{t("admin.createdBy")}</DataTableHead>
+              <DataTableHead>{t("admin.lastUpdate")}</DataTableHead>
+              <DataTableHead className="w-16">
+                <span className="sr-only">{t("admin.actions")}</span>
+              </DataTableHead>
+            </tr>
+          </thead>
+          <tbody>
+            {resumes.map((resume) => {
+              const owner = resume.ownerName || resume.ownerEmail || resume.userId;
+              return (
+                <tr
+                  key={resume.id}
+                  className="transition-colors hover:bg-muted/40"
+                  data-slot="data-table-row"
+                >
+                  <DataTableCell className="max-w-[320px] font-medium text-foreground">
+                    {/* The editor route is keyed by resume id, not user id. */}
+                    <Link
+                      href={editorHref(resume.id)}
+                      title={resume.title}
+                      className="block truncate hover:underline"
+                    >
+                      {resume.title}
+                    </Link>
+                  </DataTableCell>
+                  <DataTableCell className="max-w-[200px]">
+                    <span className="block truncate" title={owner}>
+                      {owner}
+                    </span>
+                  </DataTableCell>
+                  <DataTableCell className="whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={resume.status === "final" ? "default" : "secondary"}>
+                        {resume.status === "final" ? t("resume.status.final") : t("resume.status.draft")}
+                      </Badge>
+                      <span className="text-xs">{formatDate(resume.updatedAt, locale)}</span>
+                    </div>
+                  </DataTableCell>
+                  <DataTableActionsCell>
+                    <RowActionsMenu
+                      label={t("admin.rowActions", { name: resume.title })}
+                      actions={[
+                        {
+                          id: "edit",
+                          label: t("admin.editResume"),
+                          icon: <Pencil className="h-4 w-4 text-muted-foreground" />,
+                          onSelect: () => {
+                            router.push(editorHref(resume.id));
                           },
-                          {
-                            id: "delete",
-                            label: t("admin.deleteResume"),
-                            icon: <Trash2 className="h-4 w-4" />,
-                            destructive: true,
-                            onSelect: () => setDeleteTarget(resume),
-                          },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        },
+                        {
+                          id: "delete",
+                          label: t("admin.deleteResume"),
+                          icon: <Trash2 className="h-4 w-4" />,
+                          destructive: true,
+                          onSelect: () => setDeleteTarget(resume),
+                        },
+                      ]}
+                    />
+                  </DataTableActionsCell>
+                </tr>
+              );
+            })}
+          </tbody>
+        </DataTable>
       )}
 
       <Dialog
