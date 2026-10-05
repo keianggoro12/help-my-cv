@@ -144,6 +144,13 @@ export function ProfilePage() {
       // edits that were never stored.
       const next = await updateProfile(user.id, { name: name.trim() || user.name, phone: phone.trim() });
       if (next) {
+        try {
+          if (typeof window !== "undefined") {
+            (window as any).__session?.setUser?.(next);
+            (window as any).__session?.refresh?.();
+            window.dispatchEvent(new Event("helpmycv:storage"));
+          }
+        } catch {}
         await refresh();
         setSaved(true);
         toast({ type: "success", title: t("resume.saved") });
