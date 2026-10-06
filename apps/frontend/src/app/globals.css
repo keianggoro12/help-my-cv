@@ -302,6 +302,41 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * CV preview page boundaries
+ *
+ * Each page is its own box with real A4 dimensions, so the sheet reads as a
+ * stack of pages rather than one long strip of paper. The dashed top rule on
+ * every page after the first is the boundary a user needs: without it there is
+ * nothing to show where the paper ends, and the whole point of the preview is
+ * that it tells the truth about the print.
+ * ------------------------------------------------------------------------- */
+.cv-page {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+}
+
+.cv-preview-page {
+  border-radius: 2px;
+}
+
+.cv-preview-page + .cv-preview-page {
+  border-top: 1px dashed var(--cv-page-rule, #cbd5e1);
+}
+
+.cv-page-number {
+  position: absolute;
+  bottom: 6mm;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 7.5pt;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
  * Print
  *
  * The preview button calls window.print() and only the CV is worth printing.
@@ -330,19 +365,28 @@
     display: block !important;
   }
 
-  /* True A4 with no shadow; the preview's fit-zoom is on an ancestor that is
-     itself display:none, so the print copy is never scaled. */
-  .cv-print-sheet {
+  /* Each page is its own box with its own padding, so the page break is
+     already decided and the engine has nothing left to add. `break-after`
+     keeps the engine from splitting a page box if a page ever exceeds the
+     physical sheet, which would otherwise reintroduce the cramped page the
+     pagination exists to prevent. */
+  .cv-print-page {
     width: 210mm;
     min-height: 297mm;
     box-shadow: none !important;
+    break-after: page;
+    page-break-after: always;
   }
 
-  /* A section or an entry is a unit: `break-inside-avoid` on entries comes from
-     Tailwind, sections need it added here. */
-  .cv-print-sheet section {
-    break-inside: avoid;
-    page-break-inside: avoid;
+  /* No trailing blank page: the last page must not ask for a break. */
+  .cv-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* The page number is a screen affordance for the preview only. */
+  .cv-page-number {
+    display: none !important;
   }
 }
 

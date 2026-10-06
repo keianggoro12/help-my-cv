@@ -40,7 +40,15 @@ import type {
 } from "@helpmycv/shared";
 import { translateSection } from "@helpmycv/shared";
 
-import { ClassicSheet } from "@/components/editor/classic-sheet";
+import { ClassicHeader, ClassicSectionBody } from "@/components/editor/classic-sheet";
+import {
+  PageBody,
+  pageBoxClass,
+  pageBoxStyle,
+  usePagination,
+  type RenderBody,
+  type RenderHeading,
+} from "@/components/editor/page-stack";
 import { Button } from "@/components/ui/button";
 import { formatDateRange, formatMonthYear } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -144,7 +152,7 @@ export function PreviewPanel({ resume, locale, t }: PreviewPanelProps) {
             // never reflows when the preview size changes.
             style={{ width: "210mm", zoom: fitScale * (zoom / 100) }}
           >
-            <SheetByTemplate resume={resume} locale={locale} t={t} variant="preview" />
+            <SheetByTemplate resume={resume} locale={locale} t={t} mounted={mounted} />
           </div>
         ) : (
           <p className="mx-auto mt-10 max-w-[240px] text-center text-sm text-muted-foreground">
@@ -152,16 +160,6 @@ export function PreviewPanel({ resume, locale, t }: PreviewPanelProps) {
           </p>
         )}
       </div>
-
-      {/* Print-only copy: `hidden` on screen, `block` under `@media print`. */}
-      {mounted && hasAnything
-        ? createPortal(
-            <div className="cv-print-root hidden">
-              <SheetByTemplate resume={resume} locale={locale} t={t} variant="print" />
-            </div>,
-            document.body,
-          )
-        : null}
     </div>
   );
 }
@@ -174,77 +172,201 @@ export function PreviewPanel({ resume, locale, t }: PreviewPanelProps) {
  * comes out in a different template than the screen showed. Unknown and
  * not-yet-built ids fall back to the default layout rather than rendering
  * nothing — a CV with the wrong styling is recoverable, a blank page is not.
+ *
+ * `variant` also picks the page-box styling: the preview draws a visible page
+ * boundary, the print copy must not (a border would print).
+ */
+/**
+ * Resolves the layout for `resume.templateId` and renders both copies from one
+ * page assignment.
+ *
+ * The preview and the print copy have to agree, exactly. Two copies each
+ * measuring their own tree cannot: the print copy lives in a `display:none`
+ * portal, where every box has zero height, so its pagination would collapse
+ * the whole CV onto a single page. Measuring once, in a tree that is in the
+ * flow, removes the possibility rather than testing for it.
+ *
+ * Unknown and not-yet-built template ids fall back to the default layout rather
+ * than rendering nothing: a CV with the wrong styling is recoverable, a blank
+ * page is not.
  */
 function SheetByTemplate({
   resume,
   locale,
   t,
-  variant,
+  mounted,
 }: {
   resume: Resume;
   locale: Locale;
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
-  variant: "preview" | "print";
+  /** `createPortal` needs `document`, so the print copy waits for the client. */
+  mounted: boolean;
 }) {
-  const className = cn(
-    "bg-white px-[18mm] py-[16mm] text-slate-900",
-    variant === "preview" ? "cv-preview-page shadow-md" : "cv-print-sheet",
-    // The print sheet has no shadow and gets its size from globals.css; the
-    // preview needs one to read as a sheet of paper against the panel.
-    variant === "preview" && "text-[10.5pt] leading-snug",
+  const classic = resume.templateId === "classic";
+
+  const header = classic ? (
+    <ClassicHeader resume={resume} t={t} />
+  ) : (
+    <PreviewHeader resume={resume} t={t} />
   );
 
-  if (resume.templateId === "classic") {
-    return <ClassicSheet resume={resume} locale={locale} t={t} className={className} />;
-  }
+  const renderHeading: RenderHeading = (_key, title, continued) =>
+    classic ? (
+      <div>
+        {/* A rule above the heading rather than a border under it: the double rule
+            under the name already anchors the top of the page, so a boxed heading
+            here would stack three horizontal lines within ten millimetres of each
+            other. The gap below the heading belongs to PageBody, which counts it
+            when deciding where a page breaks. */}
+        <div className="flex items-center gap-[3mm]">
+          <span className="h-px flex-1 bg-slate-300" />
+          <h2 className="text-[10pt] font-bold uppercase tracking-[0.16em] text-slate-900">
+            {title}
+          </h2>
+          <span className="h-px flex-1 bg-slate-300" />
+        </div>
+        {continued ? (
+          <p className="mt-[1.5mm] text-center text-[7.5pt] uppercase tracking-[0.16em] text-slate-400">
+            {t("editor.continued")}
+          </p>
+        ) : null}
+      </div>
+    ) : (
+      <div>
+        <h2 className="border-b border-slate-300 pb-[1mm] text-[11pt] font-bold uppercase tracking-wide text-slate-800">
+          {title}
+        </h2>
+        {/* Repeated on a continuation page so page 2 never opens mid-section with
+            nothing to say what the entries below it belong to. */}
+        {continued ? (
+          <p className="mt-[1mm] text-[8pt] uppercase tracking-wide text-slate-400">
+            {t("editor.continued")}
+          </p>
+        ) : null}
+      </div>
+    );
 
-  return <CvSheet resume={resume} locale={locale} t={t} className={className} />;
-}
+  const renderBody: RenderBody = (group) =>
+    classic ? (
+      <ClassicSectionBody
+        sectionKey={group.sectionKey}
+        items={group.entries}
+        locale={locale}
+        present={t("field.present")}
+        t={t}
+      />
+    ) : (
+      <SectionBody
+        sectionKey={group.sectionKey}
+        items={group.entries}
+        locale={locale}
+        present={t("field.present")}
+        t={t}
+      />
+    );
 
-/** The document itself: header plus every visible section, in order. */
-function CvSheet({
-  resume,
-  locale,
-  t,
-  className,
-}: {
-  resume: Resume;
-  locale: Locale;
-  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
-  className?: string;
-}) {
-  const present = t("field.present");
+  // Page padding and the sheet's body typography. Passed to the measuring tree
+  // as well, so atoms measure at the size they will be drawn.
+  const pageClassName = "px-[18mm] py-[16mm] text-[10.5pt] leading-snug";
+
+  const { pages, pageCount, measured, measureTree } = usePagination({
+    resume,
+    locale,
+    className: pageClassName,
+    header,
+    renderHeading,
+    renderBody,
+  });
+
+  // Only the preview needs the compact type scale; the print copy inherits the
+  // sheet size from print CSS and would otherwise print at browser-default size.
+  const printClassName = "px-[18mm] py-[16mm] text-[10.5pt] leading-snug";
+
+  const renderPages = (variant: "preview" | "print", list: typeof pages) =>
+    list.map((pageGroups, pageIndex) => (
+      <div
+        key={pageIndex}
+        className={pageBoxClass(variant, variant === "preview" ? pageClassName : printClassName)}
+        style={pageBoxStyle(variant)}
+        data-page={pageIndex + 1}
+      >
+        <PageBody
+          resume={resume}
+          locale={locale}
+          header={header}
+          pageGroups={pageGroups}
+          pageIndex={pageIndex}
+          renderHeading={renderHeading}
+          renderBody={renderBody}
+        />
+        {variant === "preview" ? (
+          <span className="cv-page-number" aria-hidden>
+            {pageIndex + 1}
+          </span>
+        ) : null}
+      </div>
+    ));
 
   return (
-    <div className={className}>
-      <PreviewHeader resume={resume} t={t} />
+    <>
+      {/* The measuring tree lives here, beside the visible preview, because this
+          is the one place in the document where it can actually be measured. */}
+      {measureTree}
 
-      {/* A section with no entries is skipped entirely — including its heading.
-          In the editor an empty section is still something to click into, but
-          on paper a bare "PROJECTS" with nothing under it looks broken. */}
-      {resume.sections
-        .filter(
-          (section) =>
-            section.visible &&
-            section.key !== "personal" &&
-            section.entries.items.length > 0,
-        )
-        .map((section) => (
-          <section key={section.key} className="mt-[6mm]">
-            <h2 className="mb-[2mm] border-b border-slate-300 pb-[1mm] text-[11pt] font-bold uppercase tracking-wide text-slate-800">
-              {section.title?.trim() ? section.title : translateSection(locale, section.key)}
-            </h2>
-            {renderSection({
-              key: section.key,
-              items: section.entries.items as AnyEntry[],
-              locale,
-              present,
-              t,
-            })}
-          </section>
-        ))}
-    </div>
+      {/* Nothing is rendered until the document has been measured. Rendering the
+          un-paginated state would show one very tall sheet with no boundaries,
+          which is what the server sends and what a user sees on a slow
+          connection: a preview that contradicts the PDF it is supposed to
+          predict. A skeleton is honest about not knowing yet. */}
+      {measured ? (
+        <>
+          {/* The count is only meaningful once the pages exist. */}
+          <p className="sr-only" role="status">
+            {t("editor.pageOf", { page: 1, total: pageCount })}
+          </p>
+          <div className="flex flex-col gap-[10mm]">{renderPages("preview", pages)}</div>
+
+          {/* Print-only copy: `hidden` on screen, `block` under `@media print`,
+              and portalled to `body` because the print CSS hides every other body
+              child, and because it has to escape this column's `zoom`, which
+              would otherwise scale the printed CV.
+
+              It renders the same `pages` the preview shows, so the PDF cannot
+              disagree with the screen. Measuring is not repeated here: this copy
+              is `display:none` on screen, where every box measures zero, so a
+              second measurement pass would collapse the whole CV onto one page. */}
+          {mounted
+            ? createPortal(
+                <div className="cv-print-root hidden">{renderPages("print", pages)}</div>,
+                document.body,
+              )
+            : null}
+        </>
+      ) : (
+        <div
+          aria-hidden
+          className="w-[210mm] min-h-[297mm] rounded-sm border border-slate-200 bg-white/50 shadow-inner"
+        />
+      )}
+    </>
   );
+}
+
+/** Renders one section's entries using the default (non-classic) styling. */
+function SectionBody({
+  sectionKey,
+  items,
+  locale,
+  present,
+  t,
+}: {
+  sectionKey: string;
+  items: AnyEntry[];
+  locale: Locale;
+  present: string;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+}) {
+  return <>{renderSection({ key: sectionKey as SectionKey, items, locale, present, t })}</>;
 }
 
 function PreviewHeader({

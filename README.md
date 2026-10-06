@@ -61,7 +61,7 @@ help-my-cv/
 │           ├── components/
 │           │   ├── landing/    halaman pemasaran + aura gradient
 │           │   ├── auth/       dialog login/register
-│           │   ├── editor/     editor CV dan preview A4
+│           │   ├── editor/     editor CV, paginate.ts, page-stack.tsx, preview A4, classic-sheet.tsx
 │           │   ├── portal/     layout user dan admin
 │           │   ├── profile/    halaman profil
 │           │   ├── admin/      tabel dan halaman admin
@@ -101,7 +101,7 @@ State lokal disimpan di `apps/backend/.wrangler/state`, jadi data lokal bertahan
 
 ### Frontend
 
-Tanpa `.env`, frontend jalan dengan mock auth dan localStorage. Semua flow bisa diklik tanpa backend hidup. Akun mock: `user@helpmycv.id` / `user12345`, `admin@helpmycv.id` / `admin12345`.
+Tanpa `.env`, frontend jalan dengan mock auth dan localStorage. Semua flow bisa diklik tanpa backend hidup. Akun mock ada di `apps/frontend/src/lib/auth-store.ts`.
 
 Dengan backend hidup:
 
@@ -163,13 +163,11 @@ cd ../backend && npx wrangler deploy --env production
 
 ## Akun
 
-| Peran | Email | Password |
-| --- | --- | --- |
-| Superadmin | `superadmin@gmail.com` | `admin@12345` |
-| Demo admin | `admin@helpmycv.id` | `admin12345` |
-| Demo user | `user@helpmycv.id` | `user12345` |
+Akun demo ada di repo dan password-nya sudah diketahui publik, jadi jangan dipakai di environment yang benar-benar dipakai user. Buat akun sendiri lewat halaman register, atau jalankan seed lokal.
 
-Demo admin dan demo user hanya ada kalau migrasi 0002 dan 0007 sudah applied. Password dan hash-nya memang ada di repo, jadi rotasi kalau ini sudah tidak berlaku.
+Seed lokal ada di migrasi backend (`apps/backend/migrations/`), bukan di README. Akun yang hanya ada kalau migrasi 0002 dan 0007 sudah applied.
+
+Kalau butuh reset, hapus baris user dari D1 lokal lalu jalankan ulang migrasinya. Rotasi password demo juga perlu mengubah hash di migrasi.
 
 ---
 
@@ -186,6 +184,12 @@ Demo admin dan demo user hanya ada kalau migrasi 0002 dan 0007 sudah applied. Pa
 **Admin endpoint terpisah dari endpoint pemilik.** `/api/resumes/:id` menjawab 404 untuk bukan pemilik. `/api/admin/resumes/:id` tidak punya predicate pemilik. Jangan gabungkan dengan flag `isAdmin`.
 
 **`email` dan `password_hash` tidak writable.** lewat endpoint mana pun yang sudah ada. Mengubah email adalah migrasi akun; mengganti hash berarti mengambil alih akun orang.
+
+**Pagination dihitung satu kali, bukan dua.** Preview dan salinan cetak harus dirender dari satu `pages` yang sama. Kalau masing-masing mengukur sendiri, salinan cetak berada di portal `display:none` tempat setiap box tingginya nol, jadi seluruh CV akan dianggap muat di satu halaman. Pengukuran terjadi di `usePagination` (`page-stack.tsx`), dipanggil sekali, lalu kedua salinan render dari hasilnya.
+
+**Margin vertikal hanya di `page-stack.tsx`.** `SECTION_GAP_PX` dan `HEADING_GAP_PX` dihitung saat pengukuran dan dipakai lagi saat render. Template yang memasang margin sendiri akan membuat keduanya tidak sinkron dan tiap halaman meleset beberapa milimeter dari kapasitas yang sudah dipesan.
+
+**Template baru lewat tiga tempat.** Tambah id di `RESUME_TEMPLATES` (`packages/shared/src/defaults.ts`), tulis komponen presentasi (lihat `classic-sheet.tsx`), lalu daftarkan cabangnya di `renderHeading`/`renderBody` pada `SheetByTemplate`. Jangan buat renderer yang mengukur sendiri.
 
 ---
 
@@ -251,9 +255,11 @@ Hapus user akan menghapus CV dan sesinya lewat `ON DELETE CASCADE`.
 
 ## Yang belum ada
 
-- Template `modern`, `classic`, `minimal` belum punya renderer
+- Template `modern` dan `minimal` belum punya renderer
 - Mesin AI belum ada, `improveBullet` sekarang hanya merapikan kalimat
 - Ekspor PDF beneran belum ada, tombolnya masih membuka dialog cetak
 - Navbar pill masih menunjuk ke anchor yang belum ada isinya
 - Belum ada test suite
+- `apps/frontend/src/app/pagetest-harness/` masih ada, itu harness verifikasi pagination dan harus dihapus sebelum commit
+- `npm run lint` gagal karena `next lint` meminta setup interaktif, belum ada konfigurasi ESLint yang bisa dipakai non-interaktif
 - Belum ada rate limiting, verifikasi email, backup data

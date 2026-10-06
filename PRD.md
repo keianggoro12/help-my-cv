@@ -38,7 +38,7 @@ Orang yang sedang aktif melamar kerja dan punya lebih dari satu CV. Buttuh cepat
 
 ### 3.2 Admin
 
-Pemilik produk. Masuk ke area admin untuk melihat semua akun dan semua CV, mengedit CV milik orang lain, menghapus, dan mengubah role. Satu akun sudah disiapkan: `superadmin@gmail.com` dengan password `admin@12345`.
+Pemilik produk. Masuk ke area admin untuk melihat semua akun dan semua CV, mengedit CV milik orang lain, menghapus, dan mengubah role. Akun superadmin disiapkan lewat migrasi `0003_superadmin.sql` dan `0008_superadmin_admin_password.sql`, password-nya tidak ditulis di dokumen ini.
 
 ---
 
@@ -80,11 +80,19 @@ Dua bentuk tanggal: `date-range` dengan toggle "Present" untuk yang berlangsung,
 
 Preview A4 di sebelah kanan, zoom in/out, dan cetak lewat `window.print()`.
 
-Print CSS menyisakan hanya CV: `body > *:not(.cv-print-root) { display: none }`, bukan `visibility: hidden`, supaya tidak ada halaman kosong membanjiri hasil cetak.
+Preview menampilkan batas halaman sebagai sheet A4 yang terpisah, dengan garis putus-putus di setiap halaman setelah yang pertama dan nomor halaman. Pratinjau dan hasil cetak memakai satu pembagian halaman yang sama, jadi yang tampil di layar sama dengan yang keluar di PDF.
 
 ### 4.5 Template
 
-Empat template didefinisikan (`blank`, `modern`, `classic`, `minimal`), hanya `blank` yang tersedia. Sisanya tampil "Coming soon", supaya tidak ada janji yang belum ditepati.
+Dua template tersedia: `blank` dan `classic`. Keduanya punya renderer sendiri, bukan satu layout dengan beberapa variasi.
+
+`blank` adalah layout default: nama rata kiri, judul section bergaris bawah, bullet disc.
+
+`classic` adalah layout formal yang mengutamakan cetak: nama rata tengah uppercase dengan tracking lebar, garis rangkap di bawah nama, judul section diapit dua garis, bullet en-dash, skill ditulis sebagai kalimat bukan grid, foto di atas nama dalam grayscale.
+
+`modern` dan `minimal` masih terdaftar di `RESUME_TEMPLATES` dengan `available: false` dan tampil "Coming soon", supaya tidak ada janji yang belum ditepati.
+
+Pemilihan template disimpan di `resume.document.templateId`. Renderer dipilih dari satu tempat (`SheetByTemplate`), bukan di tiap cabang preview dan print, supaya dua salinan tidak bisa memilih layout berbeda.
 
 ### 4.6 Area admin
 
@@ -156,7 +164,7 @@ Bagian ini belum ada kodenya. Ditulis supaya tidak ada yang mengira sudah ada.
 
 ### 5.1 Template CV yang sudah ditulis
 
-`modern`, `classic`, `minimal` sudah ada di `RESUME_TEMPLATES` dengan `available: false`. Yang belum ada adalah renderer-nya. Preview sekarang selalu memakai satu layout.
+`modern` dan `minimal` sudah ada di `RESUME_TEMPLATES` dengan `available: false`. Yang belum ada adalah renderer-nya. `blank` dan `classic` sudah punya renderer masing-masing.
 
 ### 5.2 Mesin AI yang sebenarnya
 
@@ -264,7 +272,7 @@ Alasannya: Worker tidak bisa `fetch()` Worker lain di `workers.dev`. Frontend ya
 
 Production selalu punya variable itu, jadi production selalu memakai backend. Mock layer tidak mati, hanya tidak aktif, dan semua flow tetap bisa diklik tanpa server.
 
-Akun mock: `user@helpmycv.id` / `user12345` dan `admin@helpmycv.id` / `admin12345`.
+Akun mock didefinisikan di `apps/frontend/src/lib/auth-store.ts`.
 
 ### 7.5 Model keamanan
 
@@ -361,7 +369,7 @@ Ada satu script verifikasi, `apps/frontend/scripts/verify-reorder.mjs`, yang dip
 
 ## 11. Yang belum ada
 
-- Template `modern`, `classic`, `minimal` belum punya renderer
+- Template `modern` dan `minimal` belum punya renderer
 - Mesin AI belum ada, yang ada baru perapian kalimat
 - Ekspor PDF beneran belum ada, cuma dialog cetak
 - Navbar pill masih menunjuk ke anchor kosong

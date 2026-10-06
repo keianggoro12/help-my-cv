@@ -15,8 +15,10 @@
  * classic` for each one. Two layouts cost some repetition and buy two
  * documents that are each internally consistent.
  *
- * Print safety is inherited from the caller: this component only produces the
- * sheet body, and `@media print` in globals.css hides the editor around it.
+ * Pagination is not here. This module supplies the masthead, the entry bodies
+ * and the shared type constants; `page-stack.tsx` owns the section heading, the
+ * page breaks, and both the preview and the print copy that render from one
+ * page assignment.
  */
 
 import type {
@@ -31,16 +33,8 @@ import type {
   SkillEntry,
   TranslationKey,
 } from "@helpmycv/shared";
-import { translateSection } from "@helpmycv/shared";
 
 import { formatDateRange, formatMonthYear } from "@/lib/format";
-
-interface ClassicSheetProps {
-  resume: Resume;
-  locale: Locale;
-  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
-  className?: string;
-}
 
 /**
  * Small caps by CSS, not by transforming the string.
@@ -49,51 +43,17 @@ interface ClassicSheetProps {
  * typesetter would set, and it keeps the underlying text intact for copying
  * out of the PDF and for screen readers.
  */
-const HEADING = "text-[10pt] font-bold uppercase tracking-[0.16em] text-slate-900";
-const BODY = "text-[10pt] leading-[1.35] text-slate-800";
-const MUTED = "text-[9pt] text-slate-600";
+export const HEADING = "text-[10pt] font-bold uppercase tracking-[0.16em] text-slate-900";
+export const BODY = "text-[10pt] leading-[1.35] text-slate-800";
+export const MUTED = "text-[9pt] text-slate-600";
 
-export function ClassicSheet({ resume, locale, t, className }: ClassicSheetProps) {
-  const present = t("field.present");
-
-  return (
-    <div className={className}>
-      <ClassicHeader resume={resume} t={t} />
-
-      {resume.sections
-        .filter(
-          (section) =>
-            section.visible &&
-            section.key !== "personal" &&
-            section.entries.items.length > 0,
-        )
-        .map((section) => (
-          <section key={section.key} className="mt-[5mm]">
-            {/* A centred rule above the heading rather than a border under it.
-                The double rule under the name already anchors the top of the
-                page, so repeating a boxed heading here would stack three
-                horizontal lines within ten millimetres of each other. */}
-            <div className="mb-[2.5mm] flex items-center gap-[3mm]">
-              <span className="h-px flex-1 bg-slate-300" />
-              <h2 className={HEADING}>
-                {section.title?.trim() ? section.title : translateSection(locale, section.key)}
-              </h2>
-              <span className="h-px flex-1 bg-slate-300" />
-            </div>
-            <ClassicSectionBody
-              sectionKey={section.key}
-              items={section.entries.items as AnyEntry[]}
-              locale={locale}
-              present={present}
-              t={t}
-            />
-          </section>
-        ))}
-    </div>
-  );
+/** The translate function the editor passes down, in its narrowest useful form. */
+export interface Translate {
+  (key: TranslationKey, vars?: Record<string, string | number>): string;
 }
 
-function ClassicHeader({
+/** Renders this layout's masthead: photo, name, role, contacts, rule, summary. */
+export function ClassicHeader({
   resume,
   t,
 }: {
@@ -179,7 +139,7 @@ interface ClassicSectionInput {
   items: AnyEntry[];
   locale: Locale;
   present: string;
-  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+  t: Translate;
 }
 
 /**
@@ -188,7 +148,7 @@ interface ClassicSectionInput {
  * Classic entries hang their detail lines off the title rather than listing
  * everything in one flowing sentence, so the eye lands on the title first.
  */
-function ClassicSectionBody({
+export function ClassicSectionBody({
   sectionKey,
   items,
   locale,
