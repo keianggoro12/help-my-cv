@@ -284,12 +284,21 @@ function buildRequest(row: AiConfigRow, system: string, prompt: string): Provide
   };
 }
 
-/** 401/403, 429 and everything else are different admin problems, so they are different codes. */
-function statusToCode(status: number): AiErrorCode {
+/**
+ * 401/403, 429 and everything else are different admin problems, so they are
+ * different codes. `body` matters because Gemini answers a rejected key with
+ * 400 rather than 401, and a status-only rule would blame the provider for a
+ * key the admin can fix.
+ */
+function statusToCode(status: number, body = ""): AiErrorCode {
   if (status === 401 || status === 403) return "invalid_key";
   if (status === 429) return "rate_limited";
+  if (KEY_REJECTED_BY_BODY.test(body)) return "invalid_key";
   return "provider_error";
 }
+
+/** Gemini's key rejection markers: `API_KEY_INVALID` and its message text. */
+const KEY_REJECTED_BY_BODY = /API_KEY_INVALID|API key not valid/i;
 
 async function readErrorBody(response: Response): Promise<string> {
   try {
@@ -322,7 +331,9 @@ async function callModel(
   }
 
   if (!response.ok) {
-    throw new AiCallError(statusToCode(response.status), `HTTP ${response.status}: ${await readErrorBody(response)}`);
+    // Read once: the body both names the fault and becomes the logged message.
+    const detail = `HTTP ${response.status}: ${await readErrorBody(response)}`;
+    throw new AiCallError(statusToCode(response.status, detail), detail);
   }
 
   let data: Record<string, unknown>;
