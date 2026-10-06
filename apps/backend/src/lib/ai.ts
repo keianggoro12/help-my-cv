@@ -29,6 +29,7 @@ import type {
   SectionKey,
 } from "@helpmycv/shared";
 import { createId, createResume, migrateResume } from "@helpmycv/shared";
+import { AI_MODELS } from "@helpmycv/shared";
 
 import type { Env } from "./helpers";
 import { json } from "./helpers";
@@ -308,46 +309,78 @@ async function readErrorBody(response: Response): Promise<string> {
   }
 }
 
+/** Statuses we treat as transient and worth trying the next model for. */
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
 async function callModel(
   row: AiConfigRow,
   system: string,
   prompt: string,
   timeoutMs = 45_000,
 ): Promise<string> {
-  const request = buildRequest(row, system, prompt);
-
-  let response: Response;
-  try {
-    response = await fetch(request.url, {
-      method: "POST",
-      headers: request.headers,
-      body: JSON.stringify(request.body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (error) {
-    // A timeout and a refused connection both mean "we could not reach it".
-    const timedOut = error instanceof Error && error.name === "TimeoutError";
-    throw new AiCallError("network_error", timedOut ? "request timed out" : detailOf(error));
+  const models = AI_MODELS[row.provider];
+  const startIndex = models.indexOf(row.model);
+  if (startIndex === -1) {
+    // Saved model not in current list (retired) — start from default (first)
+    return callWithFallback(row, system, prompt, models, 0, timeoutMs);
   }
+  return callWithFallback(row, system, prompt, models, startIndex, timeoutMs);
+}
 
-  if (!response.ok) {
-    // Read once: the body both names the fault and becomes the logged message.
-    const detail = `HTTP ${response.status}: ${await readErrorBody(response)}`;
-    throw new AiCallError(statusToCode(response.status, detail), detail);
-  }
+async function callWithFallback(
+  row: AiConfigRow,
+  system: string,
+  prompt: string,
+  models: string[],
+  startIndex: number,
+  timeoutMs: number,
+): Promise<string> {
+  let lastDetail = "";
+  for (let i = startIndex; i < models.length; i++) {
+    const model = models[i];
+    const request = buildRequest({ ...row, model }, system, prompt);
 
-  let data: Record<string, unknown>;
-  try {
-    data = record(await response.json());
-  } catch {
-    throw new AiCallError("invalid_response", "provider reply was not JSON");
-  }
+    let response: Response;
+    try {
+      response = await fetch(request.url, {
+        method: "POST",
+        headers: request.headers,
+        body: JSON.stringify(request.body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      lastDetail = error instanceof Error ? error.message : String(error);
+      continue; // network error → next model
+    }
 
-  const text = request.extract(data).trim();
-  if (text === "") {
-    throw new AiCallError("invalid_response", "provider returned no text");
+    if (!response.ok) {
+      const detail = `HTTP ${response.status}: ${await readErrorBody(response)}`;
+      const code = statusToCode(response.status, detail);
+      lastDetail = detail;
+
+      // Retryable: try next model
+      if (RETRYABLE_STATUSES.has(response.status) || code === "rate_limited") {
+        continue;
+      }
+      // Non-retryable (invalid_key, etc): stop immediately
+      throw new AiCallError(code, detail);
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = record(await response.json());
+    } catch {
+      throw new AiCallError("invalid_response", "provider reply was not JSON");
+    }
+
+    const text = request.extract(data).trim();
+    if (text === "") {
+      throw new AiCallError("invalid_response", "provider returned no text");
+    }
+    return text;
   }
-  return text;
+  // Exhausted all models
+  throw new AiCallError("provider_error", lastDetail || "all models exhausted");
 }
 
 /* -------------------------------------------------------------------------- */
