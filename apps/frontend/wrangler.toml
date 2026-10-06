@@ -38,34 +38,4 @@ new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]
 
 [env.production]
 name = "helpmycv-frontend-production"
-main = ".open-next/worker.js"
-compatibility_date = "2025-09-23"
-compatibility_flags = ["nodejs_compat"]
-assets = { directory = ".open-next/assets", binding = "ASSETS" }
-
-[env.production.vars]
-NEXT_PUBLIC_API_BASE_URL = "https://helpmycv-backend-production.keianggoro12.workers.dev"
-
-[env.production.services]
-binding = "BACKEND"
-service = "helpmycv-backend-production"
-
-[env.production.observability]
-enabled = true
-head_sampling_rate = 1
-
-[env.production.durable_objects.bindings]
-name = "DOQueueHandler"
-class_name = "DOQueueHandler"
-
-[env.production.durable_objects.bindings]
-name = "DOShardedTagCache"
-class_name = "DOShardedTagCache"
-
-[env.production.durable_objects.bindings]
-name = "BucketCachePurge"
-class_name = "BucketCachePurge"
-
-[env.production.migrations]
-tag = "v1"
-new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]
+# Inherits everything else from base config
