@@ -12,6 +12,7 @@
  */
 
 import type { AiConfig, AiLogEntry, AiProviderId } from "@helpmycv/shared";
+import { AI_DEFAULT_MODELS, AI_MODELS } from "@helpmycv/shared";
 import { Loader2 } from "lucide-react";
 import * as React from "react";
 
@@ -33,16 +34,6 @@ import { formatDate } from "@/lib/format";
 
 const PROVIDERS: AiProviderId[] = ["openai", "anthropic", "gemini"];
 
-/**
- * Starting values, so a fresh Config screen already says something plausible
- * for each provider rather than showing an empty box the admin has to guess at.
- */
-const DEFAULT_MODELS: Record<AiProviderId, string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-3-5-haiku-latest",
-  gemini: "gemini-2.5-flash",
-};
-
 /** Save-form failures: 422 codes from the config route plus engine codes. */
 const ERROR_KEYS: Record<string, string> = {
   ai_provider_unknown: "admin.aiProviderRequired",
@@ -62,7 +53,7 @@ export function AdminConfigPage() {
   const [loading, setLoading] = React.useState(true);
 
   const [provider, setProvider] = React.useState<AiProviderId>("openai");
-  const [model, setModel] = React.useState<string>(DEFAULT_MODELS.openai);
+  const [model, setModel] = React.useState<string>(AI_DEFAULT_MODELS.openai);
   const [modelTouched, setModelTouched] = React.useState(false);
   const [apiKey, setApiKey] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -99,7 +90,7 @@ export function AdminConfigPage() {
     // Only swap the model when it still holds a default the admin never typed
     // over; a hand-written model id must survive a provider experiment.
     if (!modelTouched) {
-      setModel(DEFAULT_MODELS[next]);
+      setModel(AI_DEFAULT_MODELS[next]);
     }
   }
 
@@ -199,16 +190,21 @@ export function AdminConfigPage() {
 
           <div className="space-y-2">
             <FieldLabel htmlFor="ai-model">{t("admin.aiModelLabel")}</FieldLabel>
-            <Input
+            <Select
               id="ai-model"
               value={model}
               onChange={(event) => {
                 setModel(event.target.value);
                 setModelTouched(true);
               }}
-              placeholder={DEFAULT_MODELS[provider]}
               disabled={saving}
-            />
+            >
+              {AI_MODELS[provider].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 
