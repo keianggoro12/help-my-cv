@@ -294,6 +294,7 @@ const en = {
   "admin.aiStatusError": "Error",
   "admin.aiLoadFailed": "Could not load the AI settings.",
   "admin.loading": "Loading...",
+  "admin.aiProviderRequired": "Choose a provider first.",
   "admin.aiModelRequired": "Choose a model first.",
   "admin.aiKeyRequired": "Enter the API key first.",
 } as const;
@@ -586,6 +587,7 @@ const id: Record<TranslationKey, string> = {
   "admin.aiStatusError": "Error",
   "admin.aiLoadFailed": "Pengaturan AI gagal dimuat.",
   "admin.loading": "Memuat...",
+  "admin.aiProviderRequired": "Pilih provider dulu.",
   "admin.aiModelRequired": "Pilih model dulu.",
   "admin.aiKeyRequired": "Isi API key dulu.",
 };

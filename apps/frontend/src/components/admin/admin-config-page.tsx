@@ -45,7 +45,7 @@ const DEFAULT_MODELS: Record<AiProviderId, string> = {
 
 /** Save-form failures: 422 codes from the config route plus engine codes. */
 const ERROR_KEYS: Record<string, string> = {
-  ai_provider_unknown: "admin.aiProviderLabel",
+  ai_provider_unknown: "admin.aiProviderRequired",
   ai_model_required: "admin.aiModelRequired",
   not_configured: "admin.aiKeyRequired",
   invalid_key: "autoResume.invalidKey",
@@ -221,9 +221,7 @@ export function AdminConfigPage() {
             type="password"
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
-            placeholder={
-              hasStoredKey ? t("admin.aiKeyStored") : t("admin.aiApiKeyPlaceholder")
-            }
+            placeholder={hasStoredKey ? "••••••••" : t("admin.aiApiKeyPlaceholder")}
             autoComplete="off"
             disabled={saving}
           />
