@@ -27,6 +27,16 @@ import type {
 } from "@helpmycv/shared";
 
 /**
+ * Multi-provider config shape returned by /api/admin/ai/configs
+ * Each provider has its own config (model + hasApiKey) or null if not saved.
+ */
+export type AiConfigs = {
+  openai: AiConfig | null;
+  anthropic: AiConfig | null;
+  gemini: AiConfig | null;
+};
+
+/**
  * Base URL the *browser* prepends to `/api/*`.
  *
  * Always empty on purpose. `NEXT_PUBLIC_API_BASE_URL` configures the
@@ -239,11 +249,6 @@ export const api = {
     return request("/api/admin/ai/config");
   },
 
-  /** Saving without an `apiKey` keeps whatever key is already stored. */
-  saveAiConfig(payload: AiConfigPayload): Promise<{ config: AiConfig }> {
-    return request("/api/admin/ai/config", { method: "PUT", body: JSON.stringify(payload) });
-  },
-
   /** One cheap round trip to the model, recorded in the log either way. */
   checkAiConfig(): Promise<{ ok: boolean; code: string; message: string }> {
     return request("/api/admin/ai/config/check", { method: "POST" });
@@ -251,5 +256,15 @@ export const api = {
 
   aiLogs(): Promise<{ logs: AiLogEntry[] }> {
     return request("/api/admin/ai/logs");
+  },
+
+  /** All providers' configs at once (admin screen). */
+  aiConfigs(): Promise<{ configs: AiConfigs }> {
+    return request("/api/admin/ai/configs");
+  },
+
+  /** Save one provider's config (model + optional apiKey). */
+  saveAiConfig(payload: AiConfigPayload): Promise<{ config: AiConfig }> {
+    return request("/api/admin/ai/config", { method: "PUT", body: JSON.stringify(payload) });
   },
 };

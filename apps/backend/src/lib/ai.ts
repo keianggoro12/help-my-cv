@@ -82,9 +82,28 @@ export interface AiConfigRow {
 }
 
 export async function readAiConfig(env: Env): Promise<AiConfigRow | null> {
+  // Legacy: read the first row (for backward compat during migration)
   const row = await env.DB.prepare(
     "SELECT provider, model, api_key, updated_at FROM ai_config WHERE id = 1",
   ).first<AiConfigRow>();
+  return row ?? null;
+}
+
+export async function readAiConfigs(env: Env): Promise<Map<AiProviderId, AiConfigRow>> {
+  const rows = await env.DB.prepare(
+    "SELECT provider, model, api_key, updated_at FROM ai_configs",
+  ).all<AiConfigRow>();
+  const map = new Map<AiProviderId, AiConfigRow>();
+  for (const row of rows.results ?? []) {
+    map.set(row.provider, row);
+  }
+  return map;
+}
+
+export async function readAiConfigForProvider(env: Env, provider: AiProviderId): Promise<AiConfigRow | null> {
+  const row = await env.DB.prepare(
+    "SELECT provider, model, api_key, updated_at FROM ai_configs WHERE provider = ?",
+  ).bind(provider).first<AiConfigRow>();
   return row ?? null;
 }
 
@@ -99,19 +118,37 @@ export function toPublicConfig(row: AiConfigRow): AiConfig {
 }
 
 export async function listAiConfig(env: Env): Promise<AiConfig | null> {
-  const row = await readAiConfig(env);
-  return row ? toPublicConfig(row) : null;
+  // Legacy compat: return the first provider that has a key
+  const configs = await readAiConfigs(env);
+  for (const [, row] of configs) {
+    if (row.api_key.trim() !== "") {
+      return toPublicConfig(row);
+    }
+  }
+  return null;
+}
+
+export async function listAiConfigs(env: Env): Promise<Record<AiProviderId, AiConfig | null>> {
+  const configs = await readAiConfigs(env);
+  const result: Record<AiProviderId, AiConfig | null> = {
+    openai: null,
+    anthropic: null,
+    gemini: null,
+  };
+  for (const [provider, row] of configs) {
+    result[provider] = toPublicConfig(row);
+  }
+  return result;
 }
 
 /**
- * Upserts the single config row. An empty `apiKey` keeps the stored one, which
- * is what lets the Config form save a model change without re-typing the key.
+ * Upserts a single provider's config row. An empty `apiKey` keeps the stored one.
  */
 export async function saveAiConfig(
   env: Env,
   input: { provider: AiProviderId; model: string; apiKey?: string },
 ): Promise<AiConfig> {
-  const existing = await readAiConfig(env);
+  const existing = await readAiConfigForProvider(env, input.provider);
   const key = (input.apiKey ?? "").trim() || existing?.api_key || "";
   if (key.trim() === "") {
     throw new AiCallError("not_configured", "no api key supplied or stored");
@@ -119,10 +156,9 @@ export async function saveAiConfig(
 
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO ai_config (id, provider, model, api_key, updated_at)
-     VALUES (1, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
-       provider = excluded.provider,
+    `INSERT INTO ai_configs (provider, model, api_key, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(provider) DO UPDATE SET
        model = excluded.model,
        api_key = excluded.api_key,
        updated_at = excluded.updated_at`,
@@ -130,7 +166,8 @@ export async function saveAiConfig(
     .bind(input.provider, input.model.trim(), key.trim(), now)
     .run();
 
-  return toPublicConfig(await readAiConfig(env) as AiConfigRow);
+  const row = await readAiConfigForProvider(env, input.provider);
+  return toPublicConfig(row as AiConfigRow);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -705,8 +742,16 @@ export async function checkAiConnection(
   env: Env,
   user: SessionUser,
 ): Promise<{ ok: boolean; code: AiErrorCode | "ok"; message: string }> {
-  const row = await readAiConfig(env);
-  if (!row) {
+  const configs = await readAiConfigs(env);
+  // Find all providers that have a key
+  const candidates: AiConfigRow[] = [];
+  for (const [, row] of configs) {
+    if (row.api_key.trim() !== "") {
+      candidates.push(row);
+    }
+  }
+
+  if (candidates.length === 0) {
     await recordAiLog(env, {
       kind: "check",
       status: "error",
@@ -718,30 +763,37 @@ export async function checkAiConnection(
     return { ok: false, code: "not_configured", message: "no AI settings saved yet" };
   }
 
-  try {
-    const reply = await callModel(row, "Reply with the single word OK.", "ping", 20_000);
-    const message = reply.slice(0, 120);
-    await recordAiLog(env, {
-      kind: "check",
-      status: "ok",
-      provider: row.provider,
-      model: row.model,
-      message,
-      userId: user.id,
-    });
-    return { ok: true, code: "ok", message };
-  } catch (error) {
-    const message = detailOf(error);
-    await recordAiLog(env, {
-      kind: "check",
-      status: "error",
-      provider: row.provider,
-      model: row.model,
-      message,
-      userId: user.id,
-    });
-    return { ok: false, code: codeOf(error), message };
+  // Try each provider until one works, or all fail
+  let lastError: unknown;
+  for (const row of candidates) {
+    try {
+      const reply = await callModel(row, "Reply with the single word OK.", "ping", 20_000);
+      const message = reply.slice(0, 120);
+      await recordAiLog(env, {
+        kind: "check",
+        status: "ok",
+        provider: row.provider,
+        model: row.model,
+        message,
+        userId: user.id,
+      });
+      return { ok: true, code: "ok", message };
+    } catch (error) {
+      lastError = error;
+      await recordAiLog(env, {
+        kind: "check",
+        status: "error",
+        provider: row.provider,
+        model: row.model,
+        message: detailOf(error),
+        userId: user.id,
+      });
+    }
   }
+
+  // All providers failed
+  const message = detailOf(lastError);
+  return { ok: false, code: codeOf(lastError), message };
 }
 
 /**
@@ -754,7 +806,18 @@ export async function generateAutoResume(
   user: SessionUser,
   payload: AutoResumePayload,
 ): Promise<Resume> {
-  const row = await readAiConfig(env);
+  const configs = await readAiConfigs(env);
+  // Pick the first provider that has a key, preferring the order the admin
+  // sees in the UI (openai → anthropic → gemini)
+  const providers: AiProviderId[] = ["openai", "anthropic", "gemini"];
+  let row: AiConfigRow | null = null;
+  for (const p of providers) {
+    const cfg = configs.get(p);
+    if (cfg && cfg.api_key.trim() !== "") {
+      row = cfg;
+      break;
+    }
+  }
   if (!row) {
     await recordAiLog(env, {
       kind: "generate",
@@ -809,6 +872,10 @@ export async function generateAutoResume(
 
 export async function handleAiConfigGet(env: Env): Promise<Response> {
   return json({ config: await listAiConfig(env) });
+}
+
+export async function handleAiConfigsGet(env: Env): Promise<Response> {
+  return json({ configs: await listAiConfigs(env) });
 }
 
 export async function handleAiConfigPut(env: Env, body: unknown): Promise<Response> {

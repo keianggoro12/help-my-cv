@@ -10,6 +10,7 @@ import { handleGenerate } from "./auto-resume";
 import {
   handleAiConfigCheck,
   handleAiConfigGet,
+  handleAiConfigsGet,
   handleAiConfigPut,
   handleAiLogs,
 } from "../lib/ai";
@@ -161,6 +162,8 @@ adminRoutes.patch("/resumes/:id", async (c) => {
  * of this screen cannot leak it.
  */
 adminRoutes.get("/ai/config", (c) => handleAiConfigGet(c.env));
+
+adminRoutes.get("/ai/configs", (c) => handleAiConfigsGet(c.env));
 
 adminRoutes.put("/ai/config", async (c) => {
   let body: unknown;
