@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, LayoutDashboard, Users } from "lucide-react";
+import { FileText, LayoutDashboard, Settings2, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PortalLayout } from "@/components/portal/portal-layout";
@@ -11,6 +11,7 @@ const ADMIN_NAV: SidebarItem[] = [
   { key: "home", href: "/admin/dashboard", labelKey: "admin.title", icon: LayoutDashboard },
   { key: "users", href: "/admin/users", labelKey: "admin.users", icon: Users },
   { key: "resumes", href: "/admin/resumes", labelKey: "admin.resumes", icon: FileText },
+  { key: "config", href: "/admin/config", labelKey: "sidebar.config", icon: Settings2 },
 ];
 
 export function AdminPortalLayout({ children }: { children: ReactNode }) {

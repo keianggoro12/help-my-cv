@@ -6,6 +6,13 @@ import { json } from "../lib/helpers";
 import type { AppVariables } from "../middleware/auth";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { handleLogin, handleLogout, handleRegister, handleUpdateProfile } from "./auth";
+import { handleGenerate } from "./auto-resume";
+import {
+  handleAiConfigCheck,
+  handleAiConfigGet,
+  handleAiConfigPut,
+  handleAiLogs,
+} from "../lib/ai";
 import {
   deleteUser,
   listAllResumes,
@@ -85,6 +92,24 @@ resumeRoutes.delete("/:id", (c) => deleteResume(c.env, c.get("user").id, c.req.p
 
 export { storageRoutes };
 
+/**
+ * Auto CV: a signed-in user describes the CV they want, the engine runs the
+ * configured model and inserts the resume. The route only validates the text it
+ * is about to spend money on; the provider itself is what fails with a code.
+ */
+export const aiRoutes = new Hono<AppEnv>();
+
+aiRoutes.use("*", requireAuth);
+aiRoutes.post("/generate", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return json({ error: "invalid_body" }, 400);
+  }
+  return handleGenerate(c.env, c.get("user"), body);
+});
+
 
 /**
  * Admin: overview plus the actions an admin is expected to take on other
@@ -129,3 +154,24 @@ adminRoutes.patch("/resumes/:id", async (c) => {
   }
   return adminUpdateResume(c.env, c.req.param("id"), body);
 });
+
+/**
+ * Config: the AI settings Auto CV runs on, plus the log panel below them. The
+ * read never returns the stored key, only whether one exists, so a screenshot
+ * of this screen cannot leak it.
+ */
+adminRoutes.get("/ai/config", (c) => handleAiConfigGet(c.env));
+
+adminRoutes.put("/ai/config", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return json({ error: "invalid_body" }, 400);
+  }
+  return handleAiConfigPut(c.env, body);
+});
+
+adminRoutes.post("/ai/config/check", (c) => handleAiConfigCheck(c.env, c.get("user")));
+
+adminRoutes.get("/ai/logs", (c) => handleAiLogs(c.env));

@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Env } from "./lib/helpers";
 import { corsPreflight, json } from "./lib/helpers";
 import { attachUser } from "./middleware/auth";
-import { adminRoutes, authRoutes, resumeRoutes, storageRoutes } from "./routes";
+import { adminRoutes, aiRoutes, authRoutes, resumeRoutes, storageRoutes } from "./routes";
 
 /**
  * Help My CV API.
@@ -26,6 +26,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/resumes", resumeRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/storage", storageRoutes);
+app.route("/api/ai", aiRoutes);
 
 app.notFound((c) => json({ error: "not_found" }, 404));
 app.onError((error, c) => {

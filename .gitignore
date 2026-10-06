@@ -1,6 +1,9 @@
 node_modules/
 .next/
-.next-dev/
+# Any alternate distDir Next is run with (`NEXT_DIST_DIR=.next-dev` for the dev
+# server, `.next-ai` for a scratch build). One pattern instead of a list that
+# has to grow every time a build is run with a new name.
+.next-*/
 out/
 dist/
 *.tsbuildinfo

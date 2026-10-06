@@ -14,9 +14,13 @@
  */
 
 import type {
+  AiConfig,
+  AiConfigPayload,
+  AiLogEntry,
   ApiResume,
   ApiResumeSummary,
   ApiUser,
+  AutoResumePayload,
   CreateResumePayload,
   LoginPayload,
   RegisterPayload,
@@ -215,5 +219,37 @@ export const api = {
 
   adminDeleteUser(id: string): Promise<{ ok: true }> {
     return request(`/api/admin/users/${id}`, { method: "DELETE" });
+  },
+
+  /**
+   * Auto CV: the backend runs the configured model, inserts the resume and
+   * answers with the same shape `getResume` returns, so opening the editor
+   * right after needs no second fetch contract.
+   *
+   * Provider trouble comes back as the engine's error code in `ApiError.code`
+   * (`not_configured`, `invalid_key`, `rate_limited`, `network_error`,
+   * `invalid_response`) for the screen to translate.
+   */
+  generateAutoResume(payload: AutoResumePayload): Promise<{ resume: ApiResume }> {
+    return request("/api/ai/generate", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  /** Admin Config: stored AI settings, with the key reduced to a boolean. */
+  aiConfig(): Promise<{ config: AiConfig | null }> {
+    return request("/api/admin/ai/config");
+  },
+
+  /** Saving without an `apiKey` keeps whatever key is already stored. */
+  saveAiConfig(payload: AiConfigPayload): Promise<{ config: AiConfig }> {
+    return request("/api/admin/ai/config", { method: "PUT", body: JSON.stringify(payload) });
+  },
+
+  /** One cheap round trip to the model, recorded in the log either way. */
+  checkAiConfig(): Promise<{ ok: boolean; code: string; message: string }> {
+    return request("/api/admin/ai/config/check", { method: "POST" });
+  },
+
+  aiLogs(): Promise<{ logs: AiLogEntry[] }> {
+    return request("/api/admin/ai/logs");
   },
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, LayoutDashboard } from "lucide-react";
+import { FileText, LayoutDashboard, Sparkles } from "lucide-react";
 
 import { PortalLayout } from "@/components/portal/portal-layout";
 import type { SidebarItem } from "@/components/portal/portal-sidebar";
@@ -9,6 +9,9 @@ import type { ReactNode } from "react";
 
 const USER_NAV: SidebarItem[] = [
   { key: "overview", href: "/user/dashboard", labelKey: "sidebar.overview", icon: LayoutDashboard },
+  // Auto CV sits above Resumes: it is where a CV starts when there is nothing
+  // to edit yet, and the spec places it there deliberately.
+  { key: "autoResume", href: "/user/auto-resume", labelKey: "sidebar.autoResume", icon: Sparkles },
   { key: "resumes", href: "/user/resume-builder", labelKey: "sidebar.resumes", icon: FileText },
 ];
 

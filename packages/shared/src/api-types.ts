@@ -1,4 +1,4 @@
-import type { Resume, ResumeStatus } from "./types";
+import type { Locale, Resume, ResumeStatus, ResumeTemplateId } from "./types";
 
 export type ApiResumeSummary = {
   id: string;
@@ -56,4 +56,43 @@ export type RegisterPayload = LoginPayload & {
 
 export type CreateResumePayload = {
   title: string;
+};
+
+/** Providers the Auto CV engine knows how to talk to. */
+export type AiProviderId = "openai" | "anthropic" | "gemini";
+
+/**
+ * The AI settings an admin saves in Config. The key itself never leaves the
+ * backend: clients only get to know whether one is stored.
+ */
+export type AiConfig = {
+  provider: AiProviderId;
+  model: string;
+  hasApiKey: boolean;
+  updatedAt: string;
+};
+
+export type AiConfigPayload = {
+  provider: AiProviderId;
+  model: string;
+  /** Leave out to keep the key that is already stored. */
+  apiKey?: string;
+};
+
+/** One row of the Config log panel: every check and every Auto CV run. */
+export type AiLogEntry = {
+  id: number;
+  kind: "check" | "generate";
+  status: "ok" | "error";
+  provider: string;
+  model: string;
+  message: string;
+  createdAt: string;
+};
+
+export type AutoResumePayload = {
+  title: string;
+  description: string;
+  templateId: ResumeTemplateId;
+  locale?: Locale;
 };
