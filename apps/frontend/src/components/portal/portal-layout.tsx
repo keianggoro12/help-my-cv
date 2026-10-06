@@ -60,7 +60,7 @@ export function PortalLayout({
     <main className="min-h-screen bg-muted/40 text-foreground">
       <div
         className={cn(
-          "mx-auto flex min-h-screen gap-6 px-4 py-4 sm:px-6 lg:px-8",
+          "mx-auto flex h-[calc(100vh-2rem)] gap-6 px-4 py-4 sm:px-6 lg:px-8",
           // The editor manages its own column widths and vertical scrolling,
           // so it takes the whole viewport and drops the centred dashboard
           // measure instead of being capped at max-w-7xl.
