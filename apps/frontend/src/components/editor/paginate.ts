@@ -91,10 +91,10 @@ export interface Capacity {
  *
  * Two rules do the real work:
  *
- *   - An entry that does not fit starts a new page, and its section heading is
- *     repeated there as a "continued" heading. A page 2 that starts mid-section
- *     with no heading is much harder to read than a slightly short page 1, and
- *     repeating a heading costs one line.
+ *   - An entry that does not fit starts a new page, where the rest of its
+ *     section follows as a group marked "continued". Nothing is repeated in
+ *     the render: the continuation opens straight into its entries, keeping
+ *     the section gap above them and no heading of its own.
  *
  *   - A heading is never placed unless its first entry fits with it. A heading
  *     stranded at the foot of a page with its entries overleaf reads as a

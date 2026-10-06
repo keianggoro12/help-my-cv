@@ -210,8 +210,17 @@ function SheetByTemplate({
     <PreviewHeader resume={resume} t={t} />
   );
 
-  const renderHeading: RenderHeading = (_key, title, continued) =>
-    classic ? (
+  const renderHeading: RenderHeading = (_key, title, continued) => {
+    // A section that spills onto a later page opens with its entries and no
+    // repeated title: the reader already met the heading on the page before,
+    // and repeating it (with a "continued" label under it) only costs a line of
+    // the room the continuation entries need. PageBody still renders the
+    // heading's gap, and the paginator still charges the section gap, so the
+    // page keeps its spacing while the words disappear.
+    if (continued) {
+      return null;
+    }
+    return classic ? (
       <div>
         {/* A rule above the heading rather than a border under it: the double rule
             under the name already anchors the top of the page, so a boxed heading
@@ -225,26 +234,15 @@ function SheetByTemplate({
           </h2>
           <span className="h-px flex-1 bg-slate-300" />
         </div>
-        {continued ? (
-          <p className="mt-[1.5mm] text-center text-[7.5pt] uppercase tracking-[0.16em] text-slate-400">
-            {t("editor.continued")}
-          </p>
-        ) : null}
       </div>
     ) : (
       <div>
         <h2 className="border-b border-slate-300 pb-[1mm] text-[11pt] font-bold uppercase tracking-wide text-slate-800">
           {title}
         </h2>
-        {/* Repeated on a continuation page so page 2 never opens mid-section with
-            nothing to say what the entries below it belong to. */}
-        {continued ? (
-          <p className="mt-[1mm] text-[8pt] uppercase tracking-wide text-slate-400">
-            {t("editor.continued")}
-          </p>
-        ) : null}
       </div>
     );
+  };
 
   const renderBody: RenderBody = (group) =>
     classic ? (
