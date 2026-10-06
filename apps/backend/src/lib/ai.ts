@@ -811,13 +811,49 @@ export async function generateAutoResume(
   // sees in the UI (openai → anthropic → gemini)
   const providers: AiProviderId[] = ["openai", "anthropic", "gemini"];
   let row: AiConfigRow | null = null;
+  let lastError: unknown;
   for (const p of providers) {
     const cfg = configs.get(p);
-    if (cfg && cfg.api_key.trim() !== "") {
-      row = cfg;
-      break;
+    if (!cfg || cfg.api_key.trim() === "") continue;
+    row = cfg;
+    try {
+      const { system, prompt } = buildPrompts(payload);
+      const reply = await callModel(row, system, prompt);
+      const resume = hydrateDocument(parseModelJson(reply), user, payload);
+
+      const now = new Date().toISOString();
+      await env.DB.prepare(
+        "INSERT INTO resumes (id, user_id, title, document, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+        .bind(resume.id, user.id, resume.title, JSON.stringify(resume), now, now)
+        .run();
+
+      await recordAiLog(env, {
+        kind: "generate",
+        status: "ok",
+        provider: row.provider,
+        model: row.model,
+        message: `created ${resume.title}`,
+        userId: user.id,
+      });
+
+      return resume;
+    } catch (error) {
+      lastError = error;
+      await recordAiLog(env, {
+        kind: "generate",
+        status: "error",
+        provider: row.provider,
+        model: row.model,
+        message: detailOf(error),
+        userId: user.id,
+      });
+      // Try next provider if this one failed completely
+      continue;
     }
   }
+
+  // All providers with keys failed
   if (!row) {
     await recordAiLog(env, {
       kind: "generate",
@@ -830,40 +866,8 @@ export async function generateAutoResume(
     throw new AiCallError("not_configured");
   }
 
-  let resume: Resume;
-  try {
-    const { system, prompt } = buildPrompts(payload);
-    const reply = await callModel(row, system, prompt);
-    resume = hydrateDocument(parseModelJson(reply), user, payload);
-  } catch (error) {
-    await recordAiLog(env, {
-      kind: "generate",
-      status: "error",
-      provider: row.provider,
-      model: row.model,
-      message: detailOf(error),
-      userId: user.id,
-    });
-    throw error instanceof AiCallError ? error : new AiCallError(codeOf(error), detailOf(error));
-  }
-
-  const now = new Date().toISOString();
-  await env.DB.prepare(
-    "INSERT INTO resumes (id, user_id, title, document, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(resume.id, user.id, resume.title, JSON.stringify(resume), now, now)
-    .run();
-
-  await recordAiLog(env, {
-    kind: "generate",
-    status: "ok",
-    provider: row.provider,
-    model: row.model,
-    message: `created ${resume.title}`,
-    userId: user.id,
-  });
-
-  return resume;
+  // We have a row but it (and any fallbacks) failed
+  throw lastError instanceof AiCallError ? lastError : new AiCallError(codeOf(lastError), detailOf(lastError));
 }
 
 /* -------------------------------------------------------------------------- */
