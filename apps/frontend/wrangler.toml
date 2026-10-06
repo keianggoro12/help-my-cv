@@ -35,3 +35,30 @@ class_name = "BucketCachePurge"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]
+
+[env.production]
+name = "helpmycv-frontend-production"
+main = ".open-next/worker.js"
+compatibility_date = "2025-09-23"
+compatibility_flags = ["nodejs_compat"]
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+[vars]
+NEXT_PUBLIC_API_BASE_URL = "https://helpmycv-backend-production.keianggoro12.workers.dev"
+[[services]]
+binding = "BACKEND"
+service = "helpmycv-backend-production"
+[observability]
+enabled = true
+head_sampling_rate = 1
+[[durable_objects.bindings]]
+name = "DOQueueHandler"
+class_name = "DOQueueHandler"
+[[durable_objects.bindings]]
+name = "DOShardedTagCache"
+class_name = "DOShardedTagCache"
+[[durable_objects.bindings]]
+name = "BucketCachePurge"
+class_name = "BucketCachePurge"
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DOQueueHandler", "DOShardedTagCache", "BucketCachePurge"]

@@ -36,7 +36,7 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: https://helpmycv-backend-production.keianggoro12.workers.dev
 
       - name: Deploy to Cloudflare Workers
-        run: npx wrangler deploy
+        run: npx wrangler deploy --env production
         working-directory: apps/frontend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
