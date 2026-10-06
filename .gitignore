@@ -14,3 +14,10 @@ dist/
 # means every local migration and every local upload showed up as a binary
 # diff in review.
 .wrangler/
+
+# Build outputs that Next/OpenNext write next to the source. They change on
+# every build (hashed filenames), so tracking them turns each build into
+# hundreds of fake diffs.
+.open-next/
+.next-fresh/
+.next-test2/
