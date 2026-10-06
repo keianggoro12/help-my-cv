@@ -189,6 +189,10 @@ Kalau butuh reset, hapus baris user dari D1 lokal lalu jalankan ulang migrasinya
 
 **Margin vertikal hanya di `page-stack.tsx`.** `SECTION_GAP_PX` dan `HEADING_GAP_PX` dihitung saat pengukuran dan dipakai lagi saat render. Template yang memasang margin sendiri akan membuat keduanya tidak sinkron dan tiap halaman meleset beberapa milimeter dari kapasitas yang sudah dipesan.
 
+**Jarak antar entri diukur, bukan diulang.** `space-y` memang ada di markup template, jadi jangan ditulis ulang sebagai konstanta kedua: pohon ukur me-render probe berisi dua entri memakai `renderBody` yang sama, dan selisih `offsetTop` probe itulah yang ditambahkan `heightOf` untuk entri kedua dan seterusnya pada satu seksi. Meritme template berubah langsung mengubah perhitungannya.
+
+**Pengukuran tidak boleh menunggu `requestAnimationFrame`.** rAF tidak pernah jalan selama tab tersembunyi (tab latar belakang, iframe yang belum tampil), dan akibatnya paginasi diam-diam tidak jalan: sheet tetap satu halaman tinggi tanpa pembatas. Ukur langsung di `useLayoutEffect` (`getBoundingClientRect` memaksa layout flush), lalu ukur ulang setelah `document.fonts.ready` dan setelah foto header selesai dimuat. Tinggi juga harus dibaca lewat `layoutHeight`, bukan `getBoundingClientRect` mentah: pohon ukur berada di dalam pembungkus `zoom` panel preview, sehingga rect yang mentah hanya sekitar setengah tinggi aslinya.
+
 **Template baru lewat tiga tempat.** Tambah id di `RESUME_TEMPLATES` (`packages/shared/src/defaults.ts`), tulis komponen presentasi (lihat `classic-sheet.tsx`), lalu daftarkan cabangnya di `renderHeading`/`renderBody` pada `SheetByTemplate`. Jangan buat renderer yang mengukur sendiri.
 
 ---

@@ -313,41 +313,19 @@ function SheetByTemplate({
           is the one place in the document where it can actually be measured. */}
       {measureTree}
 
-      {/* Nothing is rendered until the document has been measured. Rendering the
-          un-paginated state would show one very tall sheet with no boundaries,
-          which is what the server sends and what a user sees on a slow
-          connection: a preview that contradicts the PDF it is supposed to
-          predict. A skeleton is honest about not knowing yet. */}
-      {measured ? (
-        <>
-          {/* The count is only meaningful once the pages exist. */}
-          <p className="sr-only" role="status">
-            {t("editor.pageOf", { page: 1, total: pageCount })}
-          </p>
-          <div className="flex flex-col gap-[10mm]">{renderPages("preview", pages)}</div>
+      {/* Render seeded pages immediately; they will be replaced by measured
+          pages after useLayoutEffect runs. This avoids blank frames and the
+          "stuck" state seen when the measuring tree didn't render in some
+          contexts. The re-measure may cause a small reflow but is less jarring
+          than an empty preview. */}
+      <div className="flex flex-col gap-[10mm]">{renderPages("preview", pages)}</div>
 
-          {/* Print-only copy: `hidden` on screen, `block` under `@media print`,
-              and portalled to `body` because the print CSS hides every other body
-              child, and because it has to escape this column's `zoom`, which
-              would otherwise scale the printed CV.
-
-              It renders the same `pages` the preview shows, so the PDF cannot
-              disagree with the screen. Measuring is not repeated here: this copy
-              is `display:none` on screen, where every box measures zero, so a
-              second measurement pass would collapse the whole CV onto one page. */}
-          {mounted
-            ? createPortal(
-                <div className="cv-print-root hidden">{renderPages("print", pages)}</div>,
-                document.body,
-              )
-            : null}
-        </>
-      ) : (
-        <div
-          aria-hidden
-          className="w-[210mm] min-h-[297mm] rounded-sm border border-slate-200 bg-white/50 shadow-inner"
-        />
-      )}
+      {mounted
+        ? createPortal(
+            <div className="cv-print-root hidden">{renderPages("print", pages)}</div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

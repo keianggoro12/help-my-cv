@@ -45,6 +45,7 @@ import {
   groupPage,
   paginate,
   paginateSignature,
+  printableSections,
 } from "@/components/editor/paginate";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +83,42 @@ function atomId(atom: PageAtom): string {
   return atom.kind === "head"
     ? `h-${atom.sectionKey}-${atom.continued ? "c" : "n"}`
     : `e-${atom.sectionKey}-${atom.entryIndex}`;
+}
+
+/**
+ * Element height in layout pixels, with any CSS `zoom` on its ancestors undone.
+ *
+ * The measuring tree lives inside the preview column, which is `zoom`ed to fit
+ * the sheet into the panel. `getBoundingClientRect` reports the *scaled* rect,
+ * so under a 0.47 fit factor every atom measures about half its real height
+ * while `CONTENT_HEIGHT_PX` stays at true A4 metrics — the whole document then
+ * "fits" on one sheet. That single mistake is what made the preview render one
+ * over-tall page with no boundary, let the print engine split the same box
+ * wherever it liked, and put page 2 hard against the paper edge.
+ *
+ * `offsetHeight` would also be unscaled, but it is rounded to whole pixels and
+ * its zoom semantics are not uniform across engines; dividing the rect by the
+ * accumulated `zoom` of the ancestor chain is exact. Browsers without `zoom`
+ * report an empty computed value and are left alone (their rects are unscaled
+ * already).
+ */
+function layoutHeight(el: HTMLElement): number {
+  const rect = el.getBoundingClientRect().height;
+  let zoom = 1;
+
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    const spec = window.getComputedStyle(node).zoom;
+    if (!spec) {
+      continue;
+    }
+    const value = parseFloat(spec);
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    zoom *= spec.trim().endsWith("%") ? value / 100 : value;
+  }
+
+  return zoom > 0 ? rect / zoom : rect;
 }
 
 export interface Pagination {
@@ -129,15 +166,12 @@ export function usePagination({
   renderBody: RenderBody;
 }): Pagination {
   const atoms = React.useMemo(() => buildAtoms(resume), [resume]);
-  // Until the document has been measured there is no way to know where a page
-  // should break, so `measured` gates the page boxes. Guessing would mean the
-  // server shipping one un-broken strip (a slow connection, or any client
-  // without JS, sees exactly that: the whole CV as a single very tall page,
-  // which is the symptom explicit pagination exists to remove). Rendering the
-  // measuring frame instead is honest: it looks like the sheet is being laid
-  // out, and it never claims a page boundary that does not exist yet.
-  const [measured, setMeasured] = React.useState(false);
+  // Seed with the full document on one page. We measure and replace with
+  // paginated pages in useLayoutEffect. This avoids blank frames and keeps the
+  // first paint predictable; the re-measure may cause a small reflow but the
+  // previous gating caused the preview to appear empty or "stuck" in prod.
   const [pages, setPages] = React.useState<PageAtom[][]>(() => [atoms]);
+  const [measured, setMeasured] = React.useState(false);
   const measureRef = React.useRef<HTMLDivElement>(null);
 
   // A signature rather than the array itself: `paginate` allocates fresh objects
@@ -157,32 +191,115 @@ export function usePagination({
       // An atom missing from the measuring tree (a section that changed between
       // render and measure) measures as zero, which can only under-fill a page,
       // never drop content off it.
-      return el?.getBoundingClientRect().height ?? 0;
+      return el ? layoutHeight(el) : 0;
+    };
+
+    // The `space-y` rhythm between two entries, read off the probes rendered
+    // with the template's own markup. `offsetTop` differences are layout
+    // pixels, so they are unaffected by the preview's `zoom`, and taking the
+    // number from the markup itself means a template that changes its rhythm
+    // cannot pull the paginator out of step with the sheet. A grid reports its
+    // two probe entries on one row, which measures as no gap; that section then
+    // keeps charging its flat, slightly generous estimate.
+    const gaps = new Map<string, number>();
+    const readGaps = () => {
+      gaps.clear();
+      measureRoot.querySelectorAll<HTMLElement>("[data-gap-probe]").forEach((probe) => {
+        const host = [probe, probe.firstElementChild].find(
+          (node): node is HTMLElement => node !== null && node.children.length >= 2,
+        );
+        if (!host) {
+          return;
+        }
+        const first = host.children[0] as HTMLElement;
+        const second = host.children[1] as HTMLElement;
+        const gap = second.offsetTop - first.offsetTop - first.offsetHeight;
+        if (gap > 0) {
+          gaps.set(probe.dataset.gapProbe ?? "", gap);
+        }
+      });
     };
 
     // A heading carries the section gap above it and the heading gap below it,
-    // so the paginator reserves the space the render will use.
+    // so the paginator reserves the space the render will use. An entry that
+    // directly follows another entry of its own section carries the list gap
+    // between them; the first entry under a heading starts a fresh list and
+    // carries none.
+    //
+    // The very first heading carries no section gap: `PageBody` gives page 1's
+    // first section no top margin, and charging it anyway would cost one
+    // heading's worth of room on the page that has the least to spare.
     const heightOf = (atom: PageAtom, index: number): number => {
       const base = rawHeight(atom, index);
-      return atom.kind === "head" ? base + SECTION_GAP_PX + HEADING_GAP_PX : base;
+      if (atom.kind === "head") {
+        const sectionGap = index === 0 ? 0 : SECTION_GAP_PX;
+        return base + sectionGap + HEADING_GAP_PX;
+      }
+      const previous = atoms[index - 1];
+      const spaced = previous?.kind === "entry" && previous.sectionKey === atom.sectionKey;
+      return spaced ? base + (gaps.get(atom.sectionKey) ?? 0) : base;
     };
 
-    const headerHeight =
-      measureRoot.querySelector<HTMLElement>('[data-cv-header]')?.getBoundingClientRect().height ?? 0;
+    // Measuring synchronously here is safe: this effect runs after the tree has
+    // been committed, and getBoundingClientRect forces the layout flush, so the
+    // numbers describe the DOM that is actually on screen.
+    //
+    // This used to wait for requestAnimationFrame, which never fires while the
+    // page is hidden (a background tab, the print preview, a loading iframe) —
+    // the paginator then silently never ran and the sheet stayed on its
+    // single over-tall seed page until something else touched it. Nothing about
+    // the measurement needs a painted frame, so it does not wait for one.
+    const measure = () => {
+      readGaps();
+      const headerEl = measureRoot.querySelector<HTMLElement>('[data-cv-header]');
+      const headerHeight = headerEl ? layoutHeight(headerEl) : 0;
+      const next = paginate(atoms, heightOf, {
+        first: CONTENT_HEIGHT_PX - PAGE_SAFETY_PX - headerHeight,
+        rest: CONTENT_HEIGHT_PX - PAGE_SAFETY_PX,
+      });
+      setPages((current) => {
+        const sig = paginateSignature(next);
+        const curSig = paginateSignature(current);
+        if (sig === curSig) return current;
+        return next;
+      });
+      setMeasured(true);
+    };
 
-    const next = paginate(atoms, heightOf, {
-      first: CONTENT_HEIGHT_PX - PAGE_SAFETY_PX - headerHeight,
-      rest: CONTENT_HEIGHT_PX - PAGE_SAFETY_PX,
+    measure();
+
+    // Line boxes move when the web font lands, and the header photo changes the
+    // header's height when it decodes — either one can push a page over the A4
+    // limit after the first measurement, so both re-run it.
+    let cancelled = false;
+    const remeasure = () => {
+      if (!cancelled) measure();
+    };
+    document.fonts?.ready.then(remeasure).catch(() => undefined);
+    const images = measureRoot.querySelectorAll('img');
+    images.forEach((img) => {
+      if (!img.complete) img.addEventListener('load', remeasure, { once: true });
     });
+    return () => {
+      cancelled = true;
+      images.forEach((img) => img.removeEventListener('load', remeasure));
+    };
+  }, [atoms]);
 
-    setPages((current) =>
-      paginateSignature(current) === paginateSignature(next) ? current : next,
-    );
-    setMeasured(true);
-    // `signature` is derived from `pages`; depending on it keeps the effect from
-    // re-running every render while still re-running whenever the assignment
-    // actually changed.
-  }, [atoms, signature]);
+  // Safety fallback: if measurement somehow never completes (e.g. the measuring
+  // tree fails to report heights in a particular layout), force a render so the
+  // preview does not stay permanently blank. This trades off a possible small
+  // mis-paginated first frame for never getting stuck in an empty state.
+  React.useEffect(() => {
+    if (measured) {
+      return;
+    }
+    const t = setTimeout(() => {
+      setPages((current) => (current.length === 0 ? [atoms] : current));
+      setMeasured(true);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [measured, atoms]);
 
   const pages2 = React.useMemo(() => pages.map((page) => groupPage(page, resume)), [pages, resume]);
 
@@ -196,6 +313,7 @@ export function usePagination({
       // cancelled inline rather than described twice by the caller.
       className={cn("pointer-events-none absolute left-0 top-0 opacity-0", className)}
       style={{ width: CONTENT_WIDTH_PX, padding: 0 }}
+      data-testid="measure-tree"
     >
       <div data-cv-header={true}>{header}</div>
       {atoms.map((atom) => (
@@ -213,6 +331,32 @@ export function usePagination({
           )}
         </div>
       ))}
+
+      {/* Entry-gap probes.
+          The `space-y` rhythm between entries lives in each template's own
+          markup, so the paginator reads it from a probe rendered with that
+          same markup rather than restating a millimetre value here — a second
+          copy of the spacing would drift the moment a template changed it.
+          Two entries are enough: the space between them is the gap, and a grid
+          (skills) reports its entries on one row, which reads as no gap and
+          costs nothing. */}
+      {printableSections(resume).map((section) => {
+        const sectionKey = section.key as SectionKey;
+        const items = section.entries.items as never[];
+        if (items.length < 2) {
+          return null;
+        }
+        return (
+          <div key={`gap-${sectionKey}`} data-gap-probe={sectionKey}>
+            {renderBody({
+              section,
+              sectionKey,
+              continued: false,
+              entries: items.slice(0, 2),
+            })}
+          </div>
+        );
+      })}
     </div>
   );
 
